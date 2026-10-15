@@ -50,7 +50,7 @@ import type { AcpHold, AgentStatus, ClientRole, PlanSummary, ServerMessage } fro
 import { holdAcpChild, releaseAcpChild } from "../lib/api.ts";
 import type { PaneControls, PaneView } from "../lib/actions.ts";
 import { usePaneLane } from "../lib/chatLane.ts";
-import { secretFieldOn, useSettings } from "../lib/settings.ts";
+import { secretFieldOn, shouldAutoFocusChat, useSettings } from "../lib/settings.ts";
 import type { TerminalColors } from "../lib/themes.ts";
 import { learnFromSend } from "../lib/tabLabels.ts";
 import { useT } from "../lib/i18n.ts";
@@ -1306,7 +1306,7 @@ export function PaneTerminal({
           cwd={cwd}
           branch={branchWord === DETACHED ? t("Detached HEAD") : branchWord}
           worktreeRepo={worktreeRepo}
-          autoFocus={active && !autoSelected && !coarse}
+          autoFocus={active && !autoSelected && shouldAutoFocusChat(settings.chatAutoFocus, coarse)}
           active={active}
           agent={agent}
           agentStatus={agentStatus}

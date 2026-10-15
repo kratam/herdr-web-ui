@@ -41,6 +41,8 @@ export const SETTINGS_KO: Record<string, string> = {
   "Enter sends": "Enter로 보내기",
   "Return inserts a new line": "Return으로 줄바꿈",
   "Panes open in": "패널을 열 때 보기",
+  "Automatic chat focus": "채팅 입력창 자동 포커스",
+  "Focus the message box when opening chat or selecting a pane. Auto skips touch screens; On also works on an iPad with an external keyboard.": "채팅을 열거나 패널을 선택하면 메시지 입력창으로 포커스를 이동합니다. 자동은 터치 화면에서 끄고, 켜기는 외장 키보드를 연결한 iPad에서도 작동합니다.",
   "Show thinking": "생각 표시",
   "Expand thinking": "생각 펼치기",
   "Collapse work": "작업 과정 접어 두기",

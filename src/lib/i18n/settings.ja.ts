@@ -41,6 +41,8 @@ export const SETTINGS_JA: Record<string, string> = {
   "Enter sends": "Enter で送信",
   "Return inserts a new line": "Return で改行",
   "Panes open in": "ペインを開く表示",
+  "Automatic chat focus": "チャット入力欄の自動フォーカス",
+  "Focus the message box when opening chat or selecting a pane. Auto skips touch screens; On also works on an iPad with an external keyboard.": "チャットを開くかペインを選択すると、メッセージ入力欄にフォーカスします。自動ではタッチ画面を除外し、オンでは外付けキーボードを接続したiPadでも動作します。",
   "Show thinking": "思考を表示",
   "Expand thinking": "思考を展開",
   "Collapse work": "作業を折りたたむ",

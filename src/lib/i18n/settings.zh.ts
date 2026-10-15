@@ -41,6 +41,8 @@ export const SETTINGS_ZH: Record<string, string> = {
   "Enter sends": "按 Enter 发送",
   "Return inserts a new line": "按 Return 换行",
   "Panes open in": "窗格默认视图",
+  "Automatic chat focus": "自动聚焦聊天输入框",
+  "Focus the message box when opening chat or selecting a pane. Auto skips touch screens; On also works on an iPad with an external keyboard.": "打开聊天或选择面板时聚焦消息输入框。自动模式会跳过触摸屏；开启后，连接外接键盘的 iPad 也可使用。",
   "Show thinking": "显示思考过程",
   "Expand thinking": "展开思考过程",
   "Collapse work": "折叠工作过程",

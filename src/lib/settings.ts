@@ -32,6 +32,12 @@ export type UsageGlance = "week" | "session";
 export type Palette = ThemeId;
 export type ChatWidth = "narrow" | "default" | "wide" | "full";
 export const CHAT_WIDTHS: readonly ChatWidth[] = ["narrow", "default", "wide", "full"];
+/** Helyi beállítás: az Auto megtartja az upstream viselkedést (érintőképernyőn nincs autofókusz); az On iPaden is fókuszál. */
+export type ChatAutoFocus = "auto" | "on" | "off";
+export const CHAT_AUTO_FOCUS: readonly ChatAutoFocus[] = ["auto", "on", "off"];
+export function shouldAutoFocusChat(mode: ChatAutoFocus, coarse: boolean): boolean {
+  return mode === "on" || (mode === "auto" && !coarse);
+}
 export type VoiceButton = "auto" | "on" | "off";
 export const VOICE_BUTTONS: readonly VoiceButton[] = ["auto", "on", "off"];
 export type VoiceEngineChoice = "auto" | "browser" | "server";
@@ -150,6 +156,7 @@ export interface Settings {
   uiFontSize: number | null;
   uiFontFamily: string;
   chatWidth: ChatWidth;
+  chatAutoFocus: ChatAutoFocus;
   /** true: Enter sends in the composer, Shift+Enter breaks the line; false: Ctrl/Cmd+Enter sends. Chosen in
    *  Settings for this device; null until then: Return breaks the line on a touch screen, as in the ChatGPT and
    *  Claude apps, and Enter sends elsewhere (enterSendsOn). Kept in a key of its own (ENTER_SENDS_STORAGE_KEY) */
@@ -232,7 +239,9 @@ type TelemetrySourceSettings = Omit<Settings,
   | "agentHarnessTool"
   | "followHerdrFocus" | "sidebarPeek" | "phoneInbox" | "sidebarBackgroundWorkspaces" | "codexDrag" | "composerArtifacts" | "composerPasteSend" | "composerBtw" | "terminalMirrorWrap" | "sidebarFilter" | "sidebarContext" | "sidebarAgentTree" | "foldHelpers" | "pcLoad"
   | "expandThinking" | "foldWork" | "customThemes" | "markdownStyle" | "autoTabNames" | "voiceEngine" | "agentGroups" | "agentGroupSort" | "terminalImages" | "terminalAttachButton"
-  | "terminalKeyboardOnRequest" | "terminalFoldKeyBar" | "terminalSecretField" | "fileFontSize" | "fileFontBase" | "editTextFiles" | "reopenFileOnReturn" | "phoneTabs">;
+  | "terminalKeyboardOnRequest" | "terminalFoldKeyBar" | "terminalSecretField" | "fileFontSize" | "fileFontBase" | "editTextFiles" | "reopenFileOnReturn" | "phoneTabs"
+  // helyi beállítás: az upstream telemetria-Worker nem ismeri, ezért nem küldjük
+  | "chatAutoFocus">;
 
 function differsFromDefault(value: unknown, defaultValue: unknown): boolean {
   return JSON.stringify(value) !== JSON.stringify(defaultValue);
@@ -317,7 +326,7 @@ export const SETTING_SCOPE = {
   sidebarPeek: "device",
   phoneInbox: "device",
   sidebarBackgroundWorkspaces: "device",
-  chatFontSize: "device", chatFontFamily: "device", fileFontSize: "device", fileFontBase: "device", uiFontSize: "device", uiFontFamily: "device", chatWidth: "device", enterSends: "device",
+  chatFontSize: "device", chatFontFamily: "device", fileFontSize: "device", fileFontBase: "device", uiFontSize: "device", uiFontFamily: "device", chatWidth: "device", chatAutoFocus: "device", enterSends: "device",
   expandThinking: "device", foldWork: "device",
   composerArtifacts: "device",
   composerPasteSend: "device",
@@ -402,6 +411,7 @@ export const DEFAULT_SETTINGS: Settings = {
   uiFontSize: null,
   uiFontFamily: "",
   chatWidth: "default",
+  chatAutoFocus: "auto",
   enterSends: null,
   autoSendQueued: true,
   autoTabNames: true,
@@ -621,6 +631,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     sidebarBackgroundWorkspaces: record["sidebarBackgroundWorkspaces"] === true,
     chatFontFamily: sanitizeFontFamily(record["chatFontFamily"]),
     chatWidth: CHAT_WIDTHS.includes(record["chatWidth"] as ChatWidth) ? record["chatWidth"] as ChatWidth : DEFAULT_SETTINGS.chatWidth,
+    chatAutoFocus: CHAT_AUTO_FOCUS.includes(record["chatAutoFocus"] as ChatAutoFocus) ? record["chatAutoFocus"] as ChatAutoFocus : DEFAULT_SETTINGS.chatAutoFocus,
     enterSends: typeof record["enterSends"] === "boolean" ? record["enterSends"] : null,
     autoSendQueued: typeof record["autoSendQueued"] === "boolean" ? record["autoSendQueued"] : DEFAULT_SETTINGS.autoSendQueued,
     autoTabNames: typeof record["autoTabNames"] === "boolean" ? record["autoTabNames"] : DEFAULT_SETTINGS.autoTabNames,
