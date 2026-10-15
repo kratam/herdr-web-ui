@@ -69,6 +69,8 @@ export const SETTINGS_KO: Record<string, string> = {
   "Panes open in": "패널 기본 화면",
   "Every pane on this device. Switching a pane's lens keeps it there until this changes. Auto: chat for an agent on a touch screen, else the terminal.": "이 기기의 모든 패널에 적용됩니다. 패널에서 화면을 바꾸면 이 설정을 다시 바꿀 때까지 그 화면으로 열립니다. 자동: 터치 화면의 에이전트는 채팅, 그 밖에는 터미널.",
   "Auto": "자동",
+  "Automatic chat focus": "채팅 입력창 자동 포커스",
+  "Focus the message box when opening chat or selecting a pane. Auto skips touch screens; On also works on an iPad with an external keyboard.": "채팅을 열거나 패널을 선택하면 메시지 입력창으로 포커스를 이동합니다. 자동은 터치 화면에서 끄고, 켜기는 외장 키보드를 연결한 iPad에서도 작동합니다.",
   "Show thinking": "생각 표시",
   "Include the agent's reasoning blocks": "에이전트의 추론 블록을 함께 보여줍니다",
   "Chat width": "채팅 너비",
