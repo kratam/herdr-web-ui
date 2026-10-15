@@ -131,6 +131,7 @@ import { useNewSessionMachine, useNewSessionState, useSessionHistoryList } from 
 import { useCommandPalette } from "./lib/useCommandPalette.ts";
 import { useRenameRequest } from "./lib/useRenameRequest.ts";
 import { useSearchRequest } from "./lib/useSearchRequest.ts";
+import { usePaletteNavigation } from "./lib/usePaletteNavigation.ts";
 import { fileViewerKey, useFilePanels } from "./lib/useFilePanels.ts";
 import { usePaneCoverage } from "./lib/usePaneCoverage.ts";
 import { useT } from "./lib/i18n.ts";
@@ -298,6 +299,7 @@ export function App() {
   const { split, setSplit, soloSlot, endSplit, splitRef, splitShownRef, lastKeyAtRef, paneDragging, setPaneDragging, gridDrop, gridDropRef, showGridDrop, hideDropTarget, clearDropPreview, paneAreaRef, tabDrag, draggedPaneRef, markSwap, markMove } = useSplitState();
   useKeptPaneBoxes(paneAreaRef, inbox.shown);
   const { paletteOpen, paletteQuery, openPalette, setPaletteOpen } = useCommandPalette();
+  const paletteNavigation = usePaletteNavigation();
   const paneControls = useRef<PaneControls | null>(null);
   const [findRequest, setFindRequest] = useState<{ paneId: string | null; serial: number }>({ paneId: null, serial: 0 });
   const { searchRequest, requestSearch } = useSearchRequest(setDrawerOpen);
@@ -785,7 +787,7 @@ export function App() {
     [closeOffered, tabCloseOffered, requestCloseTab, inbox.shown, inMode, modeOffered, enterInbox, leaveMode, revealFiles, selectPane, selectTarget, selectedPaneId, selectedPane?.own_tab, selectedMachineId, appLayout, reorderCoordinator, tabStripMounted, setView, view, terminalPeek, endPeek, updateSettings, resolvedTheme, canSignOut, lock, bell.run, enableNotifications, load, layoutRefused, moveRefused, lenses, openSidebarFilter, selectedSearchable, requestSearch, split, soloSlot, settings.webLinks, settings.sidebarBackgroundWorkspaces, openWebPage],
   );
 
-  useShortcuts(actions, locked === false);
+  useShortcuts(actions, locked === false, paletteNavigation);
   const herdrPrefixWaiting = useHerdrPrefixKeys(actions, locked === false, setLayoutNotice);
 
   useMachineGone({ machines, pendingLink, pendingFile, pendingCreate, selectedMachineRef, linkSince, selectionSince, rosterSeq, setLinkLanded, setHeaderNote, selectTargetRef, rosterTick, linkTick });
@@ -1502,7 +1504,7 @@ export function App() {
         selectTarget(worktreeFor.machineId, opened.pane_id);
       }} />}
       {unsentFor && <UnsentTextDialog machines={machines} target={unsentFor} canRecover={unsentFor.pane.agent != null} onClose={closeUnsent} onRecover={recover} />}
-      <CommandPalette key={selectedMachineId} machines={sidebarMachines} onSelect={selectTarget} open={paletteOpen} initialQuery={paletteQuery} onClose={() => setPaletteOpen(false)} snapshot={snapshot} online={selectedMachine?.state === "connected"} selectedPaneId={selectedPaneId}
+      <CommandPalette paneNavigation={paletteNavigation} key={selectedMachineId} machines={sidebarMachines} onSelect={selectTarget} open={paletteOpen} initialQuery={paletteQuery} onClose={() => setPaletteOpen(false)} snapshot={snapshot} online={selectedMachine?.state === "connected"} selectedPaneId={selectedPaneId}
         view={terminalPeek !== null ? "terminal" : view} actions={actions} watching={viewOnly(selectedMachineId)} inboxMode={inMode} />
       <MarkdownLinkMenu />
     </div></AppLayoutContext.Provider></MachineContext.Provider></MachineSessionsProvider>

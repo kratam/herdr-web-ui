@@ -2,7 +2,7 @@ import { tally } from "../lib/usageCounters.ts";
 import type { TelemetryAction } from "../../shared/telemetry.ts";
 import { moveDestinations } from "../lib/layoutTargets.ts";
 import { useAppLayout, MachineContext, useMachineApi, useMachineId } from "../lib/machineContext.tsx";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentType, type FocusEvent as ReactFocusEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type MutableRefObject, type ComponentType, type FocusEvent as ReactFocusEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { Bell, Columns2, CornerLeftUp, Folder, FolderInput, FolderOpen, FolderSearch, GitBranch, Globe, History, Inbox, ListFilter, LoaderCircle, Maximize2, MessageSquarePlus, Minimize2, Monitor, PanelLeft, Pencil, Pin, Plus, Puzzle, RefreshCw, Rows2, Settings, SunMoon, SwitchCamera, TextSearch, X } from "lucide-react";
 
 import "./CommandPalette.css";
@@ -27,7 +27,7 @@ import { agentTabName } from "../lib/sidebarAgents.ts";
 import { autoTabLabel, customTabLabel, tabLabel } from "../lib/tabName.ts";
 import { shownTabLabels, subscribeTabLabels } from "../lib/tabLabels.ts";
 import { useT } from "../lib/i18n.ts";
-import { useFocusTrap } from "../lib/useFocusTrap.ts";
+import { nativeModalOver, useFocusTrap } from "../lib/useFocusTrap.ts";
 import { localPageAddress, panelUrl } from "../lib/webPanel.ts";
 import { paneCovered } from "../lib/panePresentation.ts";
 import { useSheetSwipe } from "../lib/sheets.ts";
@@ -47,6 +47,7 @@ const FOLDERS_SHOWN = 5;
 
 interface CommandPaletteProps {
   open: boolean;
+  paneNavigation?: MutableRefObject<((direction: -1 | 1) => void) | null>;
   initialQuery?: string;
   onClose: () => void;
   machines: readonly Machine[];
@@ -158,7 +159,7 @@ export function paletteUse(id: string, inInbox: boolean): TelemetryAction | unde
   return id === "inbox-mode" && inInbox ? undefined : PALETTE_ACTIONS[id];
 }
 
-export function CommandPalette({ open, initialQuery = "", onClose, machines, onSelect, snapshot, online, selectedPaneId, view, actions, watching = false, inboxMode = false }: CommandPaletteProps) {
+export function CommandPalette({ paneNavigation, open, initialQuery = "", onClose, machines, onSelect, snapshot, online, selectedPaneId, view, actions, watching = false, inboxMode = false }: CommandPaletteProps) {
   const t = useT();
   const { settings } = useSettings();
   const firstLines = useSyncExternalStore(subscribeTabLabels, shownTabLabels, shownTabLabels);
@@ -367,6 +368,16 @@ export function CommandPalette({ open, initialQuery = "", onClose, machines, onS
   const selectedMachineName = machines.find((machine) => machine.id === machineId)?.name;
   const counts = useMemo(() => statusCounts(allPanes), [allPanes]);
   const { actionsOnly, text } = parseQuery(query);
+  useLayoutEffect(() => {
+    if (!open || !paneNavigation) return;
+    // A kereső fókusza és szövege megmarad; a háttér pane-je nem kapja meg a kombinációt.
+    paneNavigation.current = (direction) => {
+      if (actionsOnly || nativeModalOver(surface.current)) return;
+      setSelection(NO_SELECTION);
+      setFilter((current) => STATUS_FILTERS[(STATUS_FILTERS.indexOf(current) + direction + STATUS_FILTERS.length) % STATUS_FILTERS.length]!);
+    };
+    return () => { paneNavigation.current = null; };
+  }, [open, actionsOnly, paneNavigation]);
 
   // herdr's Goto picker: a row per pane under its workspace; `>` keeps the actions alone (T3 Code's
   // palette); a status filter is about panes, so it leaves the actions out, the plugins' with them;

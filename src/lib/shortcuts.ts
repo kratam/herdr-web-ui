@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type RefObject } from "react";
 import { useSettings } from "./settings.ts";
 import { bindingChord, FIXED_SHORTCUT_IDS, formatExactChord, isMacPlatform, parseExactChord, type ExactChord, type ShortcutOverrides } from "./shortcutBindings.ts";
 import { physicalKey } from "./keys.ts";
@@ -263,7 +263,7 @@ const SHORTCUT_ACTIONS: Partial<Record<ShortcutId, TelemetryAction>> = {
   "toggle-sidebar": "sidebar", "new-session": "new_workspace", "new-tab": "new_tab", "split-right": "split", "split-down": "split", "close-pane": "close_pane", settings: "settings",
 };
 
-export function useShortcuts(actions: AppActions, enabled: boolean): void {
+export function useShortcuts(actions: AppActions, enabled: boolean, paneNavigation?: RefObject<((direction: -1 | 1) => void) | null>): void {
   const { settings } = useSettings();
   useEffect(() => {
     if (!enabled) return;
@@ -273,6 +273,13 @@ export function useShortcuts(actions: AppActions, enabled: boolean): void {
       if (recordingShortcut) return;
       const shortcut = matchShortcut(event, platformIsMac, settings.shortcutOverrides);
       if (shortcut === null || shortcut === "quote-chat") return;
+      // A nyitott paletta a pane-váltó kombinációt a saját szűrőihez használja.
+      if ((shortcut === "previous-pane" || shortcut === "next-pane") && paneNavigation?.current) {
+        event.preventDefault();
+        event.stopPropagation();
+        paneNavigation.current(shortcut === "previous-pane" ? -1 : 1);
+        return;
+      }
       if (keepsKeyForText(event, shortcut)) return;
       const closeStep = shortcut === "close-pane" || shortcut === "close-tab" ? closePaneKeyStep(event, modalOpenBesides(null)) : null;
       if (closeStep === "pass") return;
@@ -352,5 +359,5 @@ export function useShortcuts(actions: AppActions, enabled: boolean): void {
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [actions, enabled, settings.shortcutOverrides]);
+  }, [actions, enabled, settings.shortcutOverrides, paneNavigation]);
 }
