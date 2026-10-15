@@ -11,7 +11,7 @@ import { FONT_FAMILY_MAX_CHARS } from "./fontFamily.ts";
 import { DEFAULT_KEY_BAR_ITEMS, migrateKeyBarItems } from "./keyBar.ts";
 import { SHARED_SETTING_KEYS } from "../../shared/preferences.ts";
 import { NOTICE_VERSION, TELEMETRY_SETTINGS_KEYS, TELEMETRY_THEME_SIDE_KEYS, telemetrySettings } from "../../shared/telemetry.ts";
-import { SETTING_SCOPE, telemetrySettingsSnapshot, alertPrefs, CHAT_FONT_MAX, CHAT_FONT_MIN, CHAT_LANE_MAX_REM, CHAT_LANE_MIN, CHAT_WIDTHS, chatFontSize, chatLaneLength, chatLaneWidth, DEFAULT_SETTINGS, MARKDOWN_WIDTHS, QUICK_REPLIES_MAX, QUICK_REPLY_MAX_CHARS, quickReplyButtons, sanitizeSettings, terminalTheme, forgetPaneViews, DICTATION_LANGUAGES, VOICE_BUTTONS, wantsVoiceInput } from "./settings.ts";
+import { SETTING_SCOPE, telemetrySettingsSnapshot, alertPrefs, CHAT_FONT_MAX, CHAT_FONT_MIN, CHAT_LANE_MAX_REM, CHAT_LANE_MIN, CHAT_WIDTHS, chatFontSize, chatLaneLength, chatLaneWidth, DEFAULT_SETTINGS, MARKDOWN_WIDTHS, QUICK_REPLIES_MAX, QUICK_REPLY_MAX_CHARS, quickReplyButtons, sanitizeSettings, shouldAutoFocusChat, terminalTheme, forgetPaneViews, DICTATION_LANGUAGES, VOICE_BUTTONS, wantsVoiceInput } from "./settings.ts";
 import { applyToDocument, loadSettings, saveSettings } from "./settings.ts";
 import { sanitizeSettings as oldSanitizeSettings, saveSettings as oldSaveSettings } from "./settings.legacy-fixture.ts";
 import { themeFor } from "./themeFor.ts";
@@ -1099,3 +1099,19 @@ describe("shared settings", () => {
   });
 });
 
+
+describe("automatic chat focus", () => {
+  it("keeps the upstream behavior until a device opts in or out", () => {
+    expect(DEFAULT_SETTINGS.chatAutoFocus).toBe("auto");
+    expect(sanitizeSettings({}).chatAutoFocus).toBe("auto");
+    expect(shouldAutoFocusChat("auto", true)).toBe(false);
+    expect(shouldAutoFocusChat("on", true)).toBe(true);
+    expect(shouldAutoFocusChat("off", false)).toBe(false);
+  });
+  it("persists each device choice and falls back to Auto for malformed values", () => {
+    for (const chatAutoFocus of ["auto", "on", "off"] as const) {
+      expect(sanitizeSettings(JSON.parse(JSON.stringify(sanitizeSettings({ chatAutoFocus })))).chatAutoFocus).toBe(chatAutoFocus);
+    }
+    for (const chatAutoFocus of [null, true, 1, "On", ["on"]]) expect(sanitizeSettings({ chatAutoFocus }).chatAutoFocus).toBe("auto");
+  });
+});
