@@ -636,6 +636,9 @@ function ChatPage() {
             update({ defaultView });
           }} />
         </SettingsRow>
+        <SettingsRow icon={TextCursorInput} label={t("Automatic chat focus")} description={t("Focus the message box when opening chat or selecting a pane. Auto skips touch screens; On also works on an iPad with an external keyboard.")} wide reset={["chatAutoFocus"]}>
+          <Segmented label={t("Automatic chat focus")} value={settings.chatAutoFocus} options={[{ value: "auto", label: t("Auto") }, { value: "on", label: t("On") }, { value: "off", label: t("Off") }]} onChange={(chatAutoFocus) => update({ chatAutoFocus })} />
+        </SettingsRow>
         {/* showThinking is every browser's, whether reasoning starts open (expandThinking) this device's */}
         <SettingsRow icon={Brain} label={t("Show thinking")} description={t("The agent's reasoning blocks: left out, folded to one line, or open. One you open or fold stays that way for its message.")} wide reset={["showThinking", "expandThinking"]}>
           <Segmented label={t("Show thinking")} value={!settings.showThinking ? "hidden" : settings.expandThinking ? "expanded" : "folded"} onChange={(shown) => update(shown === "hidden" ? { showThinking: false } : { showThinking: true, expandThinking: shown === "expanded" })} options={[{ value: "hidden", label: t("Hidden") }, { value: "folded", label: t("Folded") }, { value: "expanded", label: t("Expanded") }] as const} />
