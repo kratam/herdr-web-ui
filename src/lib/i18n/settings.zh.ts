@@ -69,6 +69,8 @@ export const SETTINGS_ZH: Record<string, string> = {
   "Panes open in": "窗格默认视图",
   "Every pane on this device. Switching a pane's lens keeps it there until this changes. Auto: chat for an agent on a touch screen, else the terminal.": "适用于此设备上的所有窗格。在窗格中切换视图后，在更改此设置之前都会以该视图打开。自动：触屏上的智能体为聊天，其余为终端。",
   "Auto": "自动",
+  "Automatic chat focus": "自动聚焦聊天输入框",
+  "Focus the message box when opening chat or selecting a pane. Auto skips touch screens; On also works on an iPad with an external keyboard.": "打开聊天或选择面板时聚焦消息输入框。自动模式会跳过触摸屏；开启后，连接外接键盘的 iPad 也可使用。",
   "Show thinking": "显示思考过程",
   "Include the agent's reasoning blocks": "一并显示 Agent 的推理块",
   "Chat width": "聊天宽度",

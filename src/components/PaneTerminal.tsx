@@ -43,7 +43,7 @@ import { PendingMessages } from "./PendingMessages.tsx";
 import type { AgentStatus, ClientRole, PlanSummary, ServerMessage } from "../../shared/protocol.ts";
 import type { PaneControls, PaneView } from "../lib/actions.ts";
 import { usePaneLane } from "../lib/chatLane.ts";
-import { useSettings, type Palette, type ResolvedTheme } from "../lib/settings.ts";
+import { useSettings, type Palette, type ResolvedTheme, shouldAutoFocusChat } from "../lib/settings.ts";
 import { useT } from "../lib/i18n.ts";
 import { isAppShortcut } from "../lib/shortcuts.ts";
 import { plainPageDirection } from "../lib/pageScroll.ts";
@@ -1258,7 +1258,7 @@ export function PaneTerminal({
           cwd={cwd}
           branch={branchWord === DETACHED ? t("Detached HEAD") : branchWord}
           worktreeRepo={worktreeRepo}
-          autoFocus={active && !autoSelected && !coarse}
+          autoFocus={active && !autoSelected && shouldAutoFocusChat(settings.chatAutoFocus, coarse)}
           active={active}
           agent={agent}
           agentStatus={agentStatus}
