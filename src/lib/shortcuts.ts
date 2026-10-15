@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type RefObject } from "react";
 import { useSettings } from "./settings.ts";
 import { bindingChord, formatExactChord, isMacPlatform, parseExactChord, type ExactChord, type ShortcutOverrides } from "./shortcutBindings.ts";
 import { physicalKey } from "./keys.ts";
@@ -234,7 +234,7 @@ export function setShortcutRecording(recording: boolean): void {
   recordingShortcut = recording;
 }
 
-export function useShortcuts(actions: AppActions, enabled: boolean): void {
+export function useShortcuts(actions: AppActions, enabled: boolean, paneNavigation?: RefObject<((direction: -1 | 1) => void) | null>): void {
   const { settings } = useSettings();
   useEffect(() => {
     if (!enabled) return;
@@ -244,6 +244,13 @@ export function useShortcuts(actions: AppActions, enabled: boolean): void {
       if (recordingShortcut) return;
       const shortcut = matchShortcut(event, platformIsMac, settings.shortcutOverrides);
       if (shortcut === null) return;
+      // A nyitott paletta a pane-váltó kombinációt a saját szűrőihez használja.
+      if ((shortcut === "previous-pane" || shortcut === "next-pane") && paneNavigation?.current) {
+        event.preventDefault();
+        event.stopPropagation();
+        paneNavigation.current(shortcut === "previous-pane" ? -1 : 1);
+        return;
+      }
       if (keepsKeyForText(event, shortcut)) return;
       event.preventDefault();
       // a held chord repeats: a tab or a split is made once per press, not once per key repeat
@@ -298,5 +305,5 @@ export function useShortcuts(actions: AppActions, enabled: boolean): void {
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [actions, enabled, settings.shortcutOverrides]);
+  }, [actions, enabled, settings.shortcutOverrides, paneNavigation]);
 }
