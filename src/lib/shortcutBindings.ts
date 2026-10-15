@@ -93,6 +93,28 @@ export function isMacPlatform(): boolean {
   return /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
 }
 
+/**
+ * Helyi átvezetés: a 0.4.8-local felvevő a pontos kombinációt objektumként tárolta
+ * ({ key, ctrlKey, metaKey, altKey, shiftKey }). Ami itt is köthető, az új szöveges alakra vált;
+ * ami nem (Ctrl, Alt, ⌘ nélkül, vagy a felvevő mai kulcskészletén kívül), az alapértékre esik vissza.
+ */
+const HUNGARIAN_KEY_POSITION: Readonly<Record<string, string>> = { "é": ";", "á": "'", "ő": "[", "ú": "]", "ű": "\\", "ü": "-", "ó": "=", "ö": "0", "í": "§" };
+
+function migrateLocalBinding(value: unknown, platformIsMac: boolean): string | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const old = value as Record<string, unknown>;
+  if (typeof old["key"] !== "string") return undefined;
+  const typed = old["key"].length === 1 ? old["key"].toLowerCase() : old["key"];
+  // a régi build az ékezetes betűt betűként tárolta: a magyar kiosztáson elfoglalt helyére vált
+  const key = HUNGARIAN_KEY_POSITION[typed] ?? typed;
+  const chord: ExactChord = { ctrl: old["ctrlKey"] === true, alt: old["altKey"] === true, shift: old["shiftKey"] === true, meta: old["metaKey"] === true, key };
+  if (!MOD_SHIFT_KEY.test(key)) return undefined;
+  if (!chord.alt && chord.shift && (platformIsMac ? chord.meta && !chord.ctrl : chord.ctrl && !chord.meta)) return key;
+  const stored = formatExactChord(chord);
+  const parsed = parseExactChord(stored);
+  return parsed !== null && exactChordRefusal(parsed, platformIsMac) === null ? stored : undefined;
+}
+
 /** Stored overrides as this device may use them: an exact chord the recorder would refuse here is dropped. */
 export function sanitizeShortcutOverrides(raw: unknown, platformIsMac = isMacPlatform()): ShortcutOverrides {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
@@ -100,7 +122,11 @@ export function sanitizeShortcutOverrides(raw: unknown, platformIsMac = isMacPla
   for (const id of CUSTOM_SHORTCUT_IDS) {
     const value = (raw as Record<string, unknown>)[id];
     if (value === null) result[id] = null;
-    if (typeof value !== "string") continue;
+    if (typeof value !== "string") {
+      const migrated = migrateLocalBinding(value, platformIsMac);
+      if (migrated !== undefined) result[id] = migrated;
+      continue;
+    }
     const chord = parseExactChord(value);
     if (MOD_SHIFT_KEY.test(value) || (chord !== null && exactChordRefusal(chord, platformIsMac) === null)) result[id] = value;
   }
