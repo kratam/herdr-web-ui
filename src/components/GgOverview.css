@@ -1,0 +1,73 @@
+.gg-overview-host { display: flex; flex: 1; flex-direction: column; min-height: 0; min-width: 0; }
+.gg-overview { flex: 1; overflow: auto; padding: var(--space-6); color: var(--text); }
+.gg-overview-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-6); }
+.gg-overview h1 { font-size: var(--fs-display); font-weight: var(--fw-medium); margin: 0 0 var(--space-2); }
+.gg-overview h2 { font-size: var(--fs-md); font-weight: var(--fw-medium); margin: 0 0 var(--space-3); }
+.gg-overview-heading p, .gg-overview small, .gg-overview-empty, .gg-overview-footnote { color: var(--text-dim); font-size: var(--fs-xs); }
+.gg-overview small { display: block; margin-top: var(--space-1); }
+.gg-overview a { color: var(--text); text-underline-offset: 3px; }
+.gg-overview-table { overflow-x: auto; }
+.gg-overview table { width: 100%; border-collapse: collapse; }
+.gg-overview th, .gg-overview td { text-align: left; padding: var(--space-4) var(--space-3); border-bottom: 1px solid var(--border); vertical-align: top; }
+.gg-overview th { color: var(--text-dim); font-size: var(--fs-xs); font-weight: var(--fw-medium); }
+.gg-overview th:first-child, .gg-overview td:first-child { padding-left: 0; }
+.gg-overview-section { margin-bottom: var(--space-6); }
+.gg-overview-section h2 { padding-bottom: var(--space-3); border-bottom: 1px solid var(--border); }
+.gg-overview-item { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-4); padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+.gg-overview-item > :first-child { min-width: 0; overflow-wrap: anywhere; }
+.gg-overview-item > :last-child:not(:first-child) { flex-shrink: 0; max-width: 40%; }
+.gg-overview-link { color: var(--text); font: inherit; padding: 0; border: 0; background: none; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+.gg-overview-link:disabled { color: var(--text-dim); text-decoration: none; }
+.gg-overview details { border-bottom: 1px solid var(--border); padding: var(--space-3) 0; }
+.gg-overview summary { white-space: pre-wrap; overflow-wrap: anywhere; }
+.gg-overview-details { padding: var(--space-3); white-space: pre-wrap; overflow-wrap: anywhere; }
+.gg-overview-warning { color: var(--text); background: var(--bg-elevated); padding: var(--space-3); border-radius: var(--radius-sm); }
+.gg-overview-footnote { margin-top: var(--space-6); max-width: 90ch; }
+@media (max-width: 640px) { .gg-overview { padding: var(--space-4); } .gg-overview-heading { flex-wrap: wrap; } .gg-overview th, .gg-overview td { padding: var(--space-3) var(--space-2); } }
+
+/* Azonos beljebb kezdés és ikonhely a gép- és workspace-sorokkal. */
+.gg-overview-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: none;
+  min-height: var(--side-row);
+  margin: var(--space-2) var(--side-gutter) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-dim);
+  background: transparent;
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.gg-overview-nav svg { width: var(--icon-size); height: var(--icon-size); flex: none; }
+.gg-overview-nav:hover { background: var(--bg-hover); color: var(--text); }
+.gg-overview-nav[aria-current="page"] { color: var(--text-strong); background: var(--bg-elevated); border-color: var(--border); }
+.gg-overview-refresh { display: inline-flex; align-items: center; gap: var(--space-2); flex: none; }
+.gg-overview-refresh svg, .gg-task-actions svg { width: 1em; height: 1em; flex: none; }
+.gg-section-count { color: var(--text-dim); font-size: var(--fs-xs); margin-left: var(--space-2); font-weight: var(--fw-regular); }
+.gg-section-hint { color: var(--text-dim); font-size: var(--fs-xs); margin: 0 0 var(--space-3); max-width: 75ch; }
+.gg-overview .gg-task { align-items: center; flex-wrap: wrap; row-gap: var(--space-3); padding: var(--space-4) 0; }
+.gg-task-content { flex: 1 1 24rem; }
+.gg-task-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
+.gg-task-heading > a, .gg-task-heading > span:first-child { font-weight: var(--fw-medium); line-height: var(--lh-base); }
+.gg-task-heading > a { text-decoration: none; }
+.gg-task-heading > a:hover { text-decoration: underline; }
+.gg-task-content small { max-width: 85ch; line-height: var(--lh-base); }
+.gg-overview .gg-task-actions { display: flex; flex: 0 1 auto; gap: var(--space-2); max-width: none; }
+.gg-task-actions .btn { display: inline-flex; align-items: center; gap: var(--space-2); border: 1px solid var(--border); font-size: var(--fs-xs); white-space: nowrap; }
+.gg-task-actions .btn:disabled { opacity: 0.45; cursor: default; }
+.gg-task-actions .btn:not(:disabled):hover { background: var(--bg-elevated); }
+.gg-overview .gg-status { display: inline-flex; align-items: center; flex: none; max-width: none; border-radius: var(--radius-pill); padding: var(--space-1) var(--space-2); color: var(--text-dim); background: var(--bg-elevated); font-size: var(--fs-xs); font-weight: var(--fw-medium); line-height: var(--lh-tight); white-space: nowrap; }
+.gg-overview .gg-status--review, .gg-overview .gg-status--waiting { color: var(--accent); background: var(--accent-tint); }
+.gg-overview .gg-status--running, .gg-overview .gg-status--working { color: var(--status-working); background: var(--status-working-tint); }
+.gg-overview .gg-status--ready, .gg-overview .gg-status--done, .gg-overview .gg-status--succeeded { color: var(--status-done); background: var(--status-done-tint); }
+.gg-overview .gg-status--failed, .gg-overview .gg-status--blocked { color: var(--status-blocked); background: var(--status-blocked-tint); }
+.gg-overview-warning .gg-overview-link { margin-left: var(--space-3); }
+@media (max-width: 640px) {
+  .gg-overview .gg-task-content { flex-basis: 100%; }
+  .gg-overview .gg-task-actions { margin-left: auto; }
+}

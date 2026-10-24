@@ -4,7 +4,7 @@
  * Kept in localStorage, so a phone that dropped the page in the background, or a reload after an
  * update, still knows. A remembered pane that has since closed is skipped by the caller's lookup.
  */
-export type ViewedScope = "workspace" | "tab";
+export type ViewedScope = "workspace" | "tab" | "workspace-view";
 
 const KEY = "ovis:last-viewed-pane";
 const LIMIT = 200;

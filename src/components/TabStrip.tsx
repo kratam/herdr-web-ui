@@ -40,6 +40,8 @@ import { lastViewedPane, rememberViewedPane } from "../lib/lastViewedPane.ts";
 const said = (reason: unknown): string => reason instanceof ApiError ? reason.detail : reason instanceof Error ? reason.message : String(reason);
 
 export interface TabStripProps {
+  /** Saját GG-kiegészítés: rögzített virtuális tab, natív tab-létrehozás nélkül. */
+  overview?: { selected: boolean; onSelect(): void };
   snapshot: SessionSnapshot;
   workspace: WorkspaceInfo;
   selectedPane: PaneInfo;
@@ -63,7 +65,7 @@ export interface TabStripProps {
   end?: ReactNode;
 }
 
-export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNewTab, onNewTerminal, onMoveToWorkspace, paneActions, panelId = PANE_TABPANEL_ID, splitDrag = false, renameRequest = null, onRenameHandled, end }: TabStripProps) {
+export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNewTab, onNewTerminal, onMoveToWorkspace, paneActions, panelId = PANE_TABPANEL_ID, splitDrag = false, renameRequest = null, onRenameHandled, end, overview }: TabStripProps) {
   const t = useT();
   const { settings } = useSettings();
   const machineId = useMachineId();
@@ -225,11 +227,11 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
     if (renameRequest === null) return;
     const tab = tabs.find((candidate) => candidate.tab_id === selectedPane.tab_id);
     // a second press while the field is open keeps what was typed in it
-    if (tab && shown && !loneTabHidden(cramped, tabs.length) && editing?.tabId !== tab.tab_id) beginRename(tab);
+    if (tab && shown && !(loneTabHidden(cramped, tabs.length) && !overview) && editing?.tabId !== tab.tab_id) beginRename(tab);
     onRenameHandled?.();
   }, [renameRequest]);
 
-  if (!shown || loneTabHidden(cramped, tabs.length)) return null;
+  if (!shown || (loneTabHidden(cramped, tabs.length) && !overview)) return null;
 
   const panesOf = (tab: HerdrTab): PaneInfo[] => panes.filter((pane) => pane.tab_id === tab.tab_id);
   const paneFor = (tab: HerdrTab): PaneInfo | undefined => {
@@ -397,8 +399,9 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
       <div ref={strip} className="tab-strip" role="tablist" aria-label={t("Tabs of {workspace}", { workspace: workspace.label })} aria-busy={reorder.moving} onKeyDown={onKeyDown} onScroll={onScroll}
         onFocus={(event) => { if (event.target.getAttribute("role") === "tab") focusedTab.current = event.target; }}
         onBlur={(event) => { if (event.relatedTarget !== null) focusedTab.current = null; }}>
+        {overview && <div className={`tab-strip-item${overview.selected ? " is-active" : ""}`}><button type="button" role="tab" className="tab-strip-tab" aria-selected={overview.selected} aria-controls={panelId} tabIndex={overview.selected ? 0 : -1} onClick={overview.onSelect}>Áttekintés</button></div>}
         {tabs.map((tab, index) => {
-          const active = tab.tab_id === selectedPane.tab_id;
+          const active = !overview?.selected && tab.tab_id === selectedPane.tab_id;
           const own = panesOf(tab);
           // Settle each pane's wait before rolling up, so a sibling's RUN or DONE stays visible.
           const status = rollupStatus(own.map((pane) => paneStatus(pane as HerdrPane)));
@@ -449,7 +452,7 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
                     if (reorder.consumeClick(event.detail) || event.ctrlKey) return;
                     event.currentTarget.focus({ preventScroll: true });
                     const pane = paneFor(tab);
-                    if (pane && pane.pane_id !== selectedPane.pane_id) onSelectPane(pane.pane_id);
+                    if (pane && (overview?.selected || pane.pane_id !== selectedPane.pane_id)) onSelectPane(pane.pane_id);
                   }}
                   onDoubleClick={() => beginRename(tab)}
                   onContextMenu={(event) => { event.preventDefault(); openPicker(event, tab); }}
