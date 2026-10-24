@@ -16,6 +16,7 @@ import { storedSidebarSplit, storeSidebarSplit, type SplitFold, type SplitOrder 
 import { SidebarActivityProvider, type SidebarActivity } from "../lib/sidebarActivity.tsx";
 import { filterSuggestions, machineFilter, sidebarFilter, type SidebarBranchLabels } from "../lib/sidebarFilter.ts";
 import { SidebarFilterProvider, useSidebarFilter } from "../lib/sidebarFilterContext.ts";
+import { GgHostLoads } from "./GgHostLoads.tsx";
 import { UsageMeters } from "./UsageMeters.tsx";
 import { SidebarAccountPcs } from "./SidebarAccountPcs.tsx";
 import { ShellPcs, unlistedShellPcs, useShellPcs } from "./ShellPcs.tsx";
@@ -287,6 +288,7 @@ export function MachineSidebar(props: Props) {
       {props.footerStart}
       {/* no Install app here: a page knows it is installed only in the app's own window, so a row kept
           showing in every tab. */}
+      {!props.watching && <GgHostLoads machines={props.machines} />}
       <div className="sidebar-footer-row">
         <button className="btn btn-ghost sidebar-footer-action sidebar-footer-settings" aria-label={t("Settings")} title={t("Settings (⌘⇧,)")} onClick={() => { tally(() => props.actions.counted?.("settings", "button")); props.actions.openSettings(); }}><Settings aria-hidden="true" /></button>
         {props.inbox && <InboxEntry {...props.inbox} />}

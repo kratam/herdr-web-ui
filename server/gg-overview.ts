@@ -32,7 +32,7 @@ export function projectCoreStatus(value: unknown): Pick<GgOverview, "tasks" | "d
     const id = str(item.id), title = str(item.title), state = str(item.state);
     if (!id || !title || !state) throw Error("invalid_task");
     const repositories = [...new Set((Array.isArray(item.working_repositories) ? item.working_repositories : []).map(v => repo(record(v).repository)).filter((v): v is string => v !== null))];
-    tasks.push({ id, title, state, story: str(item.story_identifier), url: url(item.github_url), repositories, reason: str(item.blocked_reason), updated_at: str(item.updated_at) });
+    tasks.push({ id, title, state, story: str(item.story_identifier), url: url(item.github_url), repositories, reason: str(item.blocked_reason), updated_at: str(item.updated_at), priority: Number.isInteger(item.priority) && Number(item.priority) >= 0 && Number(item.priority) <= 4 ? Number(item.priority) : null, priority_source_updated_at: str(item.priority_source_updated_at) });
   }
   const taskIds = new Set(tasks.map(task => task.id));
   const decisions: GgDecision[] = [];
@@ -119,10 +119,10 @@ export class GgOverviewService {
   }
 }
 
-export async function handleGgOverviewRequest(request: Request, service: GgOverviewService, allowed: boolean): Promise<Response> {
+export async function handleGgOverviewRequest(request: Request, service: GgOverviewService, allowed: boolean, transform: (feed: GgOverview) => GgOverview = feed => feed): Promise<Response> {
   if (!allowed) return jsonResponse({ error: { code: "read_only", message: "A GG-áttekintő interaktív helyi hozzáférést igényel." } }, 403);
   if (request.method !== "GET") return jsonResponse({ error: { code: "method_not_allowed", message: "Csak olvasás támogatott." } }, 405);
-  const response = jsonResponse(await service.read());
+  const response = jsonResponse(transform(await service.read()));
   response.headers.set("cache-control", "no-store");
   return response;
 }
