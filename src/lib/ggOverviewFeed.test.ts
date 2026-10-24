@@ -45,3 +45,12 @@ test("a late pre-reset read cannot overwrite a new authenticated read", async ()
   reads[0]!(data); await old;
   expect(cache.read().feed).toBe(current);
 });
+
+test("auth reset rejects a late write response and never retries the mutation", async () => {
+  let finish!: (value: GgOverview) => void, writes = 0;
+  const cache = new GgOverviewFeed(async () => data, Date.now, async () => { writes++; return new Promise(resolve => { finish = resolve; }); });
+  await cache.refresh();
+  const saving = cache.change({ task_id: "a", action: "priority", expected: 0, priority: 2 });
+  cache.clear(); finish(data); await saving;
+  expect(cache.read().feed).toBeNull(); expect(writes).toBe(1);
+});

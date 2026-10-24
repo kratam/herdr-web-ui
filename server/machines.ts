@@ -26,6 +26,7 @@ import { detectHost, HERDR_INSTALL_CMD, installLockOwner, type RemoteHost } from
 import type { FoundHerdrSession, FoundOvis } from "../shared/machines.ts";
 import { DESKTOP_APP_UPDATES, REVISION, type UpdateStatus } from "../shared/update.ts";
 import { discard, readCappedJson, REMOTE_LIMITS } from "./remote-json.ts";
+import { GG_HOST_LOAD_SCRIPT, parseGgHostLoad } from "./gg-host-load.ts";
 import { SshConnection, sshClient } from "./ssh.ts";
 import { WAITING_FOR_WINDOWS_LOGIN } from "./windows-herdr-start.ts";
 import { decodeOffer, SERVER_ID_PATTERN, isWssOrigin, type RelayOffer } from "../shared/relay-offer.ts";
@@ -2175,6 +2176,15 @@ export class MachineManager {
   endpoint(id: string): { url: string; token: string } | undefined {
     const runtime = this.machines.get(id);
     return runtime?.machine.enabled && runtime.machine.state === "connected" ? runtime.endpoint : undefined;
+  }
+  /** GG: csak a már csatlakoztatott gépen, rögzített olvasóparancs. */
+  async ggHostLoad(id: string) {
+    const runtime = this.machines.get(id);
+    if (!runtime?.ssh || !this.endpoint(id)) throw Error("machine_offline");
+    const generation = runtime.generation;
+    const text = await runtime.ssh.run(GG_HOST_LOAD_SCRIPT, undefined, 8000);
+    if (generation !== runtime.generation || !this.endpoint(id)) throw Error("machine_changed");
+    return parseGgHostLoad(text);
   }
   trackTerminal(id: string, close: () => void): () => void {
     const runtime = this.machines.get(id);

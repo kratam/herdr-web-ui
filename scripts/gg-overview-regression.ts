@@ -7,6 +7,8 @@ import { join } from "node:path";
 import { chromium } from "playwright-core";
 import { chromePath } from "./chrome-path.ts";
 import { createServer } from "../server/index.ts";
+import { GgAttentionStore } from "../server/gg-attention.ts";
+import { GgWorkService } from "../server/gg-work.ts";
 import { GgOverviewService } from "../server/gg-overview.ts";
 import { sessionSnapshot, tabCreate, workspaceClose, workspaceCreate } from "../server/herdr/client.ts";
 
@@ -16,6 +18,7 @@ mkdirSync(openPath); mkdirSync(closedPath);
 let server: ReturnType<typeof createServer> | undefined;
 let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 let sourceFails = false, now = Date.now();
+let linearPriority = 0, priorityWrites = 0;
 const prefix = "gg-overview-fixture";
 try {
   const paneA = (await workspaceCreate({ cwd: openPath, label: prefix })).root_pane.pane_id;
@@ -26,9 +29,13 @@ try {
     "GuestGuru/open": { repository: "GuestGuru/open", label: prefix, path: openPath },
   }), load: async () => {
     if (sourceFails) throw Error("fixture_source_failed");
-    return { version: 3, items: [{ id: "t-open", title: "Nyitott feladat", github_url: "https://github.com/GuestGuru/agent-tasks/issues/195", story_identifier: "IT-1983", state: "review", package_state: "active", working_repositories: [{ repository: "GuestGuru/open" }] }, { id: "t-closed", title: "Tervezett munka", state: "planned", package_state: "active", working_repositories: [{ repository: "GuestGuru/gg-closed-fixture" }] }], questions: [{ question_key: "q-open", task_id: "t-open", state: "pending", text: "Melyik irány legyen?", proposal: { value: true, label: "Az egyszerűbb megoldás.", rationale: "Kevesebb állapotot kell kezelni." } }] };
+    return { version: 3, items: [{ id: "t-open", title: "Nyitott feladat", github_url: "https://github.com/GuestGuru/agent-tasks/issues/195", story_identifier: "IT-1983", state: "review", package_state: "active", working_repositories: [{ repository: "GuestGuru/open" }] }, { id: "t-closed", title: "Tervezett munka", story_identifier: "IT-9999", priority: 0, state: "planned", package_state: "active", working_repositories: [{ repository: "GuestGuru/gg-closed-fixture" }] }], questions: [{ question_key: "q-open", task_id: "t-open", state: "pending", text: "Melyik irány legyen?", proposal: { value: true, label: "Az egyszerűbb megoldás.", rationale: "Kevesebb állapotot kell kezelni." } }] };
   } });
-  server = createServer({ port: 0, hostname: "127.0.0.1", token: "", stateDir: join(root, "state"), ggOverview: service, herdrProfiles: async () => [] });
+  server = createServer({ port: 0, hostname: "127.0.0.1", token: "", stateDir: join(root, "state"), ggOverview: service, ggWork: new GgWorkService(new GgAttentionStore(join(root, "state")), async (story, expected, priority) => {
+    assert.equal(story, "IT-9999"); assert.equal(expected, linearPriority);
+    linearPriority = priority; priorityWrites++;
+    return { priority, updated_at: new Date(now).toISOString() };
+  }), herdrProfiles: async () => [] });
   browser = await chromium.launch({ executablePath: chromePath(), headless: true });
   const page = await browser.newPage({ viewport: { width: 1280, height: 960 } });
   let feedReads = 0, tabRequests = 0;
@@ -140,6 +147,35 @@ try {
   await page.getByRole("heading", { name: "gg-closed-fixture", exact: true }).waitFor();
   assert.equal(await page.getByRole("tab").first().getAttribute("aria-selected"), "true");
   assert.equal((await sessionSnapshot()).workspaces.filter(workspace => workspace.label === "gg-closed-fixture").length, 1);
+  // Valódi HTTP-mentés izolált tárba; a Linear-határ fixture, éles issue nem változik.
+  await page.getByRole("combobox", { name: "Prioritás · Tervezett munka", exact: true }).selectOption("2");
+  assert.equal(priorityWrites, 0, "selecting alone never writes Linear");
+  await page.getByRole("button", { name: "Prioritás mentése · Tervezett munka", exact: true }).click();
+  await page.waitForFunction(() => (document.querySelector('[aria-label="Prioritás · Tervezett munka"]') as HTMLSelectElement)?.value === "2" && !(document.querySelector('[aria-label="Prioritás · Tervezett munka"]') as HTMLSelectElement)?.disabled);
+  assert.equal(priorityWrites, 1);
+  await page.getByRole("combobox", { name: "Későbbre · Tervezett munka", exact: true }).selectOption("7");
+  await page.getByText("Tervezett munka", { exact: true }).waitFor({ state: "hidden" });
+  await page.getByRole("combobox", { name: "Munkák szűrése", exact: true }).selectOption("snoozed");
+  await page.getByText("Tervezett munka", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Vissza a globális áttekintéshez" }).click();
+  await page.getByText("Tervezett munka", { exact: true }).waitFor({ state: "hidden" });
+  await page.getByRole("combobox", { name: "Munkák szűrése", exact: true }).selectOption("snoozed");
+  await page.getByText("Tervezett munka", { exact: true }).waitFor();
+  assert.equal(await page.getByRole("combobox", { name: "Prioritás · Tervezett munka", exact: true }).inputValue(), "2");
+  await page.getByRole("combobox", { name: "Későbbre · Tervezett munka", exact: true }).selectOption("clear");
+  await page.getByText("Tervezett munka", { exact: true }).waitFor({ state: "hidden" });
+  await page.getByRole("combobox", { name: "Munkák szűrése", exact: true }).selectOption("now");
+  await page.getByRole("combobox", { name: "Prioritás · Tervezett munka", exact: true }).selectOption("3");
+  assert.equal(priorityWrites, 1, "selecting alone never writes Linear");
+  await page.getByRole("button", { name: "Prioritás mentése · Tervezett munka", exact: true }).click();
+  await page.waitForFunction(() => (document.querySelector('[aria-label="Prioritás · Tervezett munka"]') as HTMLSelectElement)?.value === "3" && !(document.querySelector('[aria-label="Prioritás · Tervezett munka"]') as HTMLSelectElement)?.disabled);
+  assert.equal(priorityWrites, 2);
+  await page.goto(`http://127.0.0.1:${server.port}/?ggOverview=global`);
+  await page.getByRole("link", { name: "gg-closed-fixture", exact: true }).waitFor();
+  assert.equal(await page.getByRole("combobox", { name: "Prioritás · Tervezett munka", exact: true }).inputValue(), "3");
+  await page.getByRole("link", { name: "gg-closed-fixture", exact: true }).click();
+  await page.getByRole("heading", { name: "gg-closed-fixture", exact: true }).waitFor();
+  assert.equal(await page.getByRole("combobox", { name: "Prioritás · Tervezett munka", exact: true }).inputValue(), "3");
   sourceFails = true; now += 65_000;
   await page.getByRole("button", { name: "Frissítés", exact: true }).click();
   await page.getByText("Az autoagent-adatok most nem olvashatók.", { exact: false }).waitFor();
@@ -151,7 +187,7 @@ try {
   assert.ok((await firstFailureRow.locator("td").nth(1).innerText()).startsWith("—"));
   assert.ok((await firstFailureRow.locator("td").nth(2).innerText()).startsWith("—"));
   assert.deepEqual(errors, []);
-  console.log("PASS: sidebar utolsó natív/áttekintő tabja, next/prev áttekintővel, cache tabváltás után, clipboard-hiba tabnyitás nélkül, másolás majd Codex/Claude tab üzenet nélkül; globális/workspace-nézet, jsonb javaslat, első tab kis képernyőn is, paletta-gyorsbillentyű, natív tabváltás, inaktív split megőrzése, bezárt workspace, első és későbbi forráshiba.");
+  console.log("PASS: külön prioritás-mentés mindkét nézetben, tartós story-szintű halasztás/visszavonás, nincs írás puszta kiválasztásra; sidebar utolsó natív/áttekintő tabja, next/prev áttekintővel, cache tabváltás után, clipboard-hiba tabnyitás nélkül, másolás majd Codex/Claude tab üzenet nélkül; globális/workspace-nézet, jsonb javaslat, első tab kis képernyőn is, paletta-gyorsbillentyű, natív tabváltás, inaktív split megőrzése, bezárt workspace, első és későbbi forráshiba.");
 } finally {
   await browser?.close(); server?.stop();
   for (const workspace of (await sessionSnapshot()).workspaces) {

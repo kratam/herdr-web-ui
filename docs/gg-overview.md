@@ -100,3 +100,43 @@ A sidebar workspace-váltása az utoljára látott tabot hozza vissza, beleértv
 Áttekintést is; a globális lista linkje mindig az Áttekintést nyitja meg. Az előző/
 következő pane gyorsbillentyű a meglévő sorrendben a virtuális első tabokat is
 érinti. Watch módban a korábbi natív navigáció marad.
+
+## Hostload és személyes munkalista
+
+A sidebar alján a meglévő előfizetéses mérők fölött látható a gépek terhelése:
+**1 perces load / logikai CPU** (nem CPU-százalék). A részletekben az 5/15 perces
+átlag és a mérés ideje. Percenként, csak látható lapon frissül; a szerver gépenként
+összevonja a kéréseket. Távolról a meglévő hitelesített SSH-mesteren fix olvasóparancs
+fut. Nincs új bridge-bundle vagy SSH-belépési párbeszéd. Hibás/régi mérés nem nulla;
+Windows load jelenleg nem mérhető.
+
+A globális összesítés alatt és a workspace munkáinál ugyanaz a prioritásválasztó,
+nézet- és rendezésvezérlő jelenik meg. A prioritás a kanonikus **Linear-storyé**,
+minden hozzá tartozó technikai task osztozik rajta. A 0 külön „Besorolandó”.
+A Linear-írás kiválasztás utáni külön Mentés/megerősítés gombbal történik a meglévő proxyzott
+felhasználói tokennel; friss Linear-prioritás ellenőrzése előzi meg. Ütközéskor
+nem írunk felül, bizonytalan eredménykor nincs automatikus újrapróbálás.
+A Linear nem ad feltételes `issueUpdate`-et: az előzetes olvasás és az írás közti
+külső szerkesztési versenyt nem lehet tranzakcióként kizárni. Az Ovis a saját,
+egy storyhoz tartozó párhuzamos írásokat tiltja.
+
+A **Későbbre** választó a tervezett munka személyes átnézését halasztja 1/2 nappal,
+1/2 héttel, 30 nappal vagy egyéni időpontig. A döntések és hibák mindig megmaradnak,
+a futtatási sor nem változik; ez nem `not_before`, `later`, `parking` vagy due date.
+A „Későbbre tett” és „Összes” nézetből bármikor visszahozható. Lejáratkor a prioritás
+szerinti helyére kerül. A szerver stateDir mappájának privát `gg-attention.json`
+fájlja tárolja story szerint, atomikus írással; a szerver minden böngészője megosztja.
+Sérült fájlt nem írunk felül. A sikeresen mentett Linear-érték jelölt áthidaló
+adatként megmarad, amíg a core-tükör utoléri.
+
+A 2026-10-24-i, csak olvasó felmérés 270 tervezett Linear-storyból 155-ben talált
+prioritást, 115-ben nem. 37 tervezett storynál az aktuális értékhez lokális agentírás
+köthető, a közvetlenül előtte látott emberi mondatban prioritási jelzés nélkül.
+Ez **felülvizsgálati jelölt, nem bizonyított jogosulatlan besorolás**. Az ilyen,
+még azonos értékű prioritást külön jelöljük; megváltoztatása vagy megerősítése
+nyugtázza az átnézést. Régi értéket a felmérés alapján nem módosítottunk.
+A közös agentutasítás előírja: fontossági emberi szándék nélkül új issue prioritása 0.
+
+Privát végpontok: `GET /api/gg/host-loads`, `PUT /api/gg/work`.
+Mindkettő a meglévő hitelesítés mögött, csak interaktív helyi kliensnek érhető el;
+a PUT-ra a meglévő same-origin védelem is érvényes. Watch és bridge nem fér hozzá.

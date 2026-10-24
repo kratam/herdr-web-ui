@@ -8,6 +8,11 @@ export interface GgTask {
   repositories: string[];
   reason: string | null;
   updated_at: string | null;
+  priority?: number | null;
+  priority_source_updated_at?: string | null;
+  priority_needs_review?: boolean;
+  priority_sync_pending?: boolean;
+  snoozed_until?: string | null;
 }
 export interface GgDecision {
   id: string;
