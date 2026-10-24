@@ -174,6 +174,8 @@ interface MenuState { anchor: HTMLElement; point?: { x: number; y: number }; pre
 interface ConfirmState { title: string; body: string; action?: string; run: () => Promise<void>; escalation?: { label: string; code: string; run: () => Promise<void> } }
 
 export interface SidebarProps {
+  /** Saját GG-áttekintő megnyitása a workspace nevére kattintva. */
+  onWorkspaceOverview?: (workspaceId: string, paneId: string) => void;
   snapshot: SessionSnapshot | null;
   online: boolean;
   selectedPaneId: string | null;
@@ -186,7 +188,7 @@ export interface SidebarProps {
  * Spaces follow herdr's workspace roster. A workspace opens its current pane; tabs and split
  * panes are navigated through the tab strip, while Agents is an independent API-backed list.
  */
-export function Sidebar({ snapshot, online, selectedPaneId, actions, watching = false }: SidebarProps) {
+export function Sidebar({ snapshot, online, selectedPaneId, actions, watching = false, onWorkspaceOverview }: SidebarProps) {
   const t = useT();
   const { settings } = useSettings();
   const twoLine = settings.sidebarRows === "two";
@@ -709,13 +711,13 @@ export function Sidebar({ snapshot, online, selectedPaneId, actions, watching = 
           data-pane={pane.pane_id}
           aria-current={selected ? "true" : undefined}
           title={[`${pane.pane_id} — ${rowTitle}`, branchNote, ...paths, paneTitle(pane), agentsTitle(workspace)].filter(Boolean).join(" — ")}
-          onClick={() => actions.selectPane(pane.pane_id)}
+          onClick={() => onWorkspaceOverview ? onWorkspaceOverview(workspace.workspace_id, pane.pane_id) : actions.selectPane(pane.pane_id)}
           onKeyDown={(event) => {
             onRowKeyDown(event, workspace.workspace_id);
             if (event.defaultPrevented) return;
             if (event.key !== "Enter" && event.key !== " ") return;
             event.preventDefault();
-            actions.selectPane(pane.pane_id);
+            if (onWorkspaceOverview) onWorkspaceOverview(workspace.workspace_id, pane.pane_id); else actions.selectPane(pane.pane_id);
           }}
         >
           {rowMark(pane, workspace.worktree?.is_linked_worktree === true)}

@@ -217,7 +217,7 @@ export function setShortcutRecording(recording: boolean): void {
   recordingShortcut = recording;
 }
 
-export function useShortcuts(actions: AppActions, enabled: boolean, paneNavigation?: RefObject<((direction: -1 | 1) => void) | null>): void {
+export function useShortcuts(actions: AppActions, enabled: boolean, paneNavigation?: RefObject<((direction: -1 | 1) => void) | null>, allowed?: (shortcut: ShortcutId) => boolean): void {
   const { settings } = useSettings();
   useEffect(() => {
     if (!enabled) return;
@@ -235,6 +235,7 @@ export function useShortcuts(actions: AppActions, enabled: boolean, paneNavigati
         return;
       }
       if (keepsKeyForText(event)) return;
+      if (allowed && !allowed(shortcut)) return;
       event.preventDefault();
       // a held chord repeats: a tab or a split is made once per press, not once per key repeat
       if (event.repeat && (shortcut === "new-tab" || shortcut === "split-right" || shortcut === "split-down")) return;
@@ -285,5 +286,5 @@ export function useShortcuts(actions: AppActions, enabled: boolean, paneNavigati
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [actions, enabled, settings.shortcutOverrides, paneNavigation]);
+  }, [actions, enabled, settings.shortcutOverrides, paneNavigation, allowed]);
 }

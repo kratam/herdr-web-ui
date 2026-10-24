@@ -39,6 +39,8 @@ export interface HerdrUiConfig {
 }
 
 /** Friendly aliases used across the UI. */
+/** GET /api/gg/overview -> GgOverview. Saját helyi GG-adatok, csak interaktív hozzáféréssel; bridge/watch: 403. */
+export type { GgOverview } from "./gg-overview.ts";
 export type HerdrWorkspace = WorkspaceInfo;
 export type HerdrTab = TabInfo;
 /**
