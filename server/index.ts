@@ -1,4 +1,7 @@
 import "./adopt-legacy-env.ts";
+import { GgHostLoads } from "./gg-host-load.ts";
+import { GgAttentionStore } from "./gg-attention.ts";
+import { GgWorkService } from "./gg-work.ts";
 import { GgOverviewService, liveRepositoryRoots } from "./gg-overview.ts";
 import { createCore, type SocketData } from "./core/index.ts";
 import { ClientConnectionLog } from "./client-connection-log.ts";
@@ -143,6 +146,7 @@ export function createServer(
     usage?: UsageService;
     /** Saját GG-kiegészítés; a teszt a titok nélküli olvasót adja be. */
     ggOverview?: GgOverviewService;
+    ggWork?: GgWorkService;
     /** Tests supply an isolated proxy service, never a user's configured instance. */
     cliProxy?: CLIProxyService;
     /** Tests use a disposable credential home and stand-in CLI binaries. */
@@ -231,6 +235,8 @@ export function createServer(
   const usage = options.usage ?? new UsageService(undefined, undefined, (refresh) => cliProxy.report(refresh));
   // a sign-in the browser followed ends in the server's own PTY, not a herdr pane: it says so itself
   usageLogin.onLoginEnded(() => usage.invalidate());
+  const ggWork = options.ggWork ?? new GgWorkService(new GgAttentionStore(options.stateDir ?? defaultStateDir()));
+  const ggLoads = new GgHostLoads(async id => { if (!machines) throw Error("no_machines"); return machines.ggHostLoad(id); });
   const ggOverview = options.ggOverview ?? new GgOverviewService({ roots: liveRepositoryRoots });
   const voice = options.voice ?? new VoiceService({ stateDir, env: process.env, fetch });
   /** a login named here is taken as it is: a tagged node has none of its own to read (OVIS_TAILSCALE_OWNER) */
@@ -314,7 +320,7 @@ export function createServer(
 
   const requestLog = new RequestLog(stateDir);
   const services: RequestServices = {
-    options, hostname, token, bridgeToken, bootId, devices, preferences, herdrSidebar, identityOf, serveOnly, portalGuards, shellAgents, agentDetector, agentOffered, agentInstaller, openCodeState, cliProxyRoutes, usageLogin, usage, ggOverview, voice, browserSnapshot, core, seen, piReader, orderSequence, clientConnectionLog, requestLog, portalStartup,
+    options, hostname, token, bridgeToken, bootId, devices, preferences, herdrSidebar, identityOf, serveOnly, portalGuards, shellAgents, agentDetector, agentOffered, agentInstaller, openCodeState, cliProxyRoutes, usageLogin, usage, ggOverview, ggWork, ggLoads, voice, browserSnapshot, core, seen, piReader, orderSequence, clientConnectionLog, requestLog, portalStartup,
     get portalStartupResult() { return portalStartupResult; },
   };
 

@@ -38,6 +38,8 @@ import { handleTelemetryRequest, visitSurface } from "./telemetry.ts";
 import type { TelemetryIngress } from "../shared/telemetry.ts";
 import { handleStatuslineRequest, handleUsageRequest } from "./usage.ts";
 import { handleGgOverviewRequest, type GgOverviewService } from "./gg-overview.ts";
+import type { GgHostLoads } from "./gg-host-load.ts";
+import type { GgWorkService } from "./gg-work.ts";
 import { handleVoiceRequest } from "./voice.ts";
 import { BRIDGE_PROTOCOL } from "../shared/machines.ts";
 import { bridgeIdentity } from "./bridge.ts";
@@ -81,6 +83,8 @@ export interface RequestServices {
   readonly usage: UsageService;
   /** Saját GG-kiegészítés (server/gg-overview.ts). */
   readonly ggOverview: GgOverviewService;
+  readonly ggWork: GgWorkService;
+  readonly ggLoads: GgHostLoads;
   readonly voice: VoiceService;
   readonly browserSnapshot: <S extends SessionSnapshot>(snapshot: S) => S;
   readonly core: ReturnType<typeof createCore>;
@@ -104,7 +108,7 @@ export interface ServerContext {
 }
 
 export async function handleRequest(request: Request, ctx: ServerContext): Promise<Response | undefined> {
-  const { options, hostname, token, bridgeToken, bootId, devices, preferences, herdrSidebar, identityOf, serveOnly, portalGuards, shellAgents, agentDetector, agentOffered, agentInstaller, openCodeState, cliProxyRoutes, usageLogin, usage, ggOverview, voice, browserSnapshot, core, seen, piReader, orderSequence, clientConnectionLog, requestLog, portalStartupResult, portalStartup } = ctx.services;
+  const { options, hostname, token, bridgeToken, bootId, devices, preferences, herdrSidebar, identityOf, serveOnly, portalGuards, shellAgents, agentDetector, agentOffered, agentInstaller, openCodeState, cliProxyRoutes, usageLogin, usage, ggOverview, ggWork, ggLoads, voice, browserSnapshot, core, seen, piReader, orderSequence, clientConnectionLog, requestLog, portalStartupResult, portalStartup } = ctx.services;
   const { sidecar, serialize, push, logPushError, omo, claudeAgents, opencodeAgents, plans, clientSnapshot, machines, broadcastAll, collector, queueFirstMessage } = core;
   return requestLog.handle(request, async (headers) => {
   const startup = portalStartupResult ?? await portalStartup;
@@ -332,7 +336,19 @@ export async function handleRequest(request: Request, ctx: ServerContext): Promi
   // the finishes read in some browser of this server; a watching device reads them and cannot add to them (above)
   if (pathname === "/api/seen") { setRequestRoute(pathname); return handleSeenRequest(request, seen); }
 
-  if (pathname === "/api/gg/overview") { setRequestRoute(pathname); ctx.timeout(request, 60); return handleGgOverviewRequest(request, ggOverview, !readOnly && !bridgeAuthorized); }
+  if (pathname === "/api/gg/overview") { setRequestRoute(pathname); ctx.timeout(request, 60); return handleGgOverviewRequest(request, ggOverview, !readOnly && !bridgeAuthorized, feed => ggWork.decorate(feed)); }
+  if (pathname === "/api/gg/work") {
+    setRequestRoute(pathname);
+    if (readOnly || bridgeAuthorized) return jsonResponse({ error: { code: "read_only", message: "Interaktív helyi hozzáférés szükséges." } }, 403);
+    if (request.method !== "PUT") return jsonResponse({ error: { code: "method_not_allowed", message: "Csak PUT támogatott." } }, 405);
+    return ggWork.handle(request, await ggOverview.read(), true);
+  }
+  if (pathname === "/api/gg/host-loads") {
+    setRequestRoute(pathname);
+    if (readOnly || bridgeAuthorized) return jsonResponse({ error: { code: "read_only", message: "Interaktív helyi hozzáférés szükséges." } }, 403);
+    if (request.method !== "GET") return jsonResponse({ error: { code: "method_not_allowed", message: "Csak GET támogatott." } }, 405);
+    return ggLoads.response(machines?.list() ?? [{ id: "local", state: "connected" }]);
+  }
   if (pathname === "/api/usage") { setRequestRoute(pathname); return handleUsageRequest(request, url, usage); }
   // on or off only: the server decides what is installed and where (server/statusline-install.ts)
   if (pathname === "/api/usage/statusline") { setRequestRoute(pathname); return handleStatuslineRequest(request, usage); }
