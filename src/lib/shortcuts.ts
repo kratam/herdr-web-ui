@@ -263,7 +263,7 @@ const SHORTCUT_ACTIONS: Partial<Record<ShortcutId, TelemetryAction>> = {
   "toggle-sidebar": "sidebar", "new-session": "new_workspace", "new-tab": "new_tab", "split-right": "split", "split-down": "split", "close-pane": "close_pane", settings: "settings",
 };
 
-export function useShortcuts(actions: AppActions, enabled: boolean, paneNavigation?: RefObject<((direction: -1 | 1) => void) | null>): void {
+export function useShortcuts(actions: AppActions, enabled: boolean, paneNavigation?: RefObject<((direction: -1 | 1) => void) | null>, allowed?: (shortcut: ShortcutId) => boolean): void {
   const { settings } = useSettings();
   useEffect(() => {
     if (!enabled) return;
@@ -281,6 +281,7 @@ export function useShortcuts(actions: AppActions, enabled: boolean, paneNavigati
         return;
       }
       if (keepsKeyForText(event, shortcut)) return;
+      if (allowed && !allowed(shortcut)) return;
       const closeStep = shortcut === "close-pane" || shortcut === "close-tab" ? closePaneKeyStep(event, modalOpenBesides(null)) : null;
       if (closeStep === "pass") return;
       event.preventDefault();
@@ -359,5 +360,5 @@ export function useShortcuts(actions: AppActions, enabled: boolean, paneNavigati
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [actions, enabled, settings.shortcutOverrides, paneNavigation]);
+  }, [actions, enabled, settings.shortcutOverrides, paneNavigation, allowed]);
 }

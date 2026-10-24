@@ -67,6 +67,8 @@ export interface HerdrUiConfig {
   keys?: HerdrKeys;
 }
 
+/** GET /api/gg/overview -> GgOverview. Saját helyi GG-adatok, csak interaktív hozzáféréssel; bridge/watch: 403. */
+export type { GgOverview } from "./gg-overview.ts";
 /**
  * A workspace's checkout as herdr reports it. herdr-core adds `git_id`, the identity of the checkout's
  * git folder this row was drawn with: Delete worktree checkout… sends it back, so a checkout added

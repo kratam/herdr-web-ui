@@ -36,6 +36,8 @@ import { setTabLabelLearning, settleTabLabels, subscribeTabLabels } from "./lib/
 import { customTabLabel, tabLabel } from "./lib/tabName.ts";
 import { agentName } from "./lib/runtimeMove.ts";
 import { TabStrip } from "./components/TabStrip.tsx";
+import { GgOverviewHost, GgOverviewTitle } from "./components/GgOverview.tsx";
+import { useGgOverview } from "./lib/useGgOverview.ts";
 import { SettingsDialog } from "./components/SettingsDialog.tsx";
 import { loadedOnSettingsEntry } from "./lib/settingsHistory.ts";
 import { useSettingsDialog } from "./lib/useSettingsDialog.ts";
@@ -454,10 +456,12 @@ export function App() {
     if (reload) window.location.reload();
   }, [auth?.via, clearPendingKeys, loadHealth, t]);
 
-  const { selectedMachineRef, selectTarget, selectTargetRef, picks } = useSelectTarget({ selectedMachineId, setConnected, setConnectedBefore, setSelectedMachineId, setSelectedPaneId, setAutoSelected, setDrawerOpen, setOutputStopped, setNotificationViewTarget, setTerminalPeek, pendingLink, pendingFile, setLinkLanded, selectionHint, selectionSince, rosterSeq, snapshot, selectedMachine, selectedPaneId, setHeaderNote, linkTick, movingPanes, onPick: (paneId) => { setupGuide.stepAside(); if (paneId !== null) inbox.leave(); },
+  const { selectedMachineRef, selectTarget: selectTargetBase, picks } = useSelectTarget({ selectedMachineId, setConnected, setConnectedBefore, setSelectedMachineId, setSelectedPaneId, setAutoSelected, setDrawerOpen, setOutputStopped, setNotificationViewTarget, setTerminalPeek, pendingLink, pendingFile, setLinkLanded, selectionHint, selectionSince, rosterSeq, snapshot, selectedMachine, selectedPaneId, setHeaderNote, linkTick, movingPanes, onPick: (paneId) => { setupGuide.stepAside(); if (paneId !== null) inbox.leave(); },
     onLinkMiss: () => { if (inbox.enabled) inbox.show(); } });
 
-  const { selectPane } = useSelectPane({ pendingLink, pendingFile, setLinkLanded, selectionHint, selectedPaneId, setSelectedPaneId, setNotificationViewTarget, setTerminalPeek, setAutoSelected, setDrawerOpen, setHeaderNote, onPick: () => { picks.current += 1; setupGuide.stepAside(); inbox.leave(); } });
+  const { selectPane: selectPaneBase } = useSelectPane({ pendingLink, pendingFile, setLinkLanded, selectionHint, selectedPaneId, setSelectedPaneId, setNotificationViewTarget, setTerminalPeek, setAutoSelected, setDrawerOpen, setHeaderNote, onPick: () => { picks.current += 1; setupGuide.stepAside(); inbox.leave(); } });
+  const gg = useGgOverview({ locked, watching: auth?.role === "watch", snapshot, selectedMachineId, selectedPaneId, selectTarget: selectTargetBase, selectPane: selectPaneBase, setDrawerOpen });
+  const { selectTarget, selectTargetRef, selectPane } = gg;
 
   const layoutRefused = useLayoutRefused(setLayoutNotice, t);
   const moveRefused = useMoveRefused(setLayoutNotice, t);
@@ -538,12 +542,12 @@ export function App() {
   // a web link main opened in the built-in browser (Settings → Browser for links) is shown there once main lists it
   useBrowserLinkTabs(browserTabs !== null && filePanelAvailable && !inMode && locked === false, (id) => { openBrowserTab("new"); setOpeningTab(id); });
   const browserShown = browserTabs !== null && filePanelAvailable && !inMode && (browserTab === "new" || shownBrowserTab !== null) && webPage === null && !(viewing !== null && fileDocked);
-  const panePresence = useCallback((): PanePresence => !(locked === false && linkLanded && pendingFile.current === null && pendingCreate.current === null
+  const panePresence = useCallback((): PanePresence => !(gg.target === null && locked === false && linkLanded && pendingFile.current === null && pendingCreate.current === null
     && !drawerOpen && !settingsOpen && !newSessionOpen
     && !(filesOpen && !filesDocked) && !machineDialog && !paletteOpen && !diffViewing && !(viewing && !fileDocked)
     && !dialogCover && !paneCovered() && !inbox.shown) ? "covered"
     : contentReady && paneContentPresented(contentKey) ? "front" : "loading",
-  [locked, linkLanded, inbox.shown, drawerOpen, settingsOpen, newSessionOpen, filesOpen, filesDocked, machineDialog, paletteOpen, diffViewing, viewing, fileDocked, dialogCover, contentReady, contentKey]);
+  [gg.target, locked, linkLanded, inbox.shown, drawerOpen, settingsOpen, newSessionOpen, filesOpen, filesDocked, machineDialog, paletteOpen, diffViewing, viewing, fileDocked, dialogCover, contentReady, contentKey]);
   const activity = useSidebarActivityState(machines, selectedMachineId, presentedPaneId, panePresence, shareSeen);
   useAgentStateStamping(machines, activity);
 
@@ -610,6 +614,7 @@ export function App() {
         if (keyJumpHeld()) return;
         const panes = rosterPanes(snapshotRef.current?.panes ?? [], selectedPaneId);
         if (panes.length === 0) return;
+        if (gg.stepPane(panes, direction)) return;
         const index = panes.findIndex((pane) => pane.pane_id === selectedPaneId);
         const next = panes[(index + direction + panes.length) % panes.length];
         if (next) selectPane(next.pane_id);
@@ -787,7 +792,7 @@ export function App() {
     [closeOffered, tabCloseOffered, requestCloseTab, inbox.shown, inMode, modeOffered, enterInbox, leaveMode, revealFiles, selectPane, selectTarget, selectedPaneId, selectedPane?.own_tab, selectedMachineId, appLayout, reorderCoordinator, tabStripMounted, setView, view, terminalPeek, endPeek, updateSettings, resolvedTheme, canSignOut, lock, bell.run, enableNotifications, load, layoutRefused, moveRefused, lenses, openSidebarFilter, selectedSearchable, requestSearch, split, soloSlot, settings.webLinks, settings.sidebarBackgroundWorkspaces, openWebPage],
   );
 
-  useShortcuts(actions, locked === false, paletteNavigation);
+  useShortcuts(actions, locked === false, paletteNavigation, gg.allowShortcut);
   const herdrPrefixWaiting = useHerdrPrefixKeys(actions, locked === false, setLayoutNotice);
 
   useMachineGone({ machines, pendingLink, pendingFile, pendingCreate, selectedMachineRef, linkSince, selectionSince, rosterSeq, setLinkLanded, setHeaderNote, selectTargetRef, rosterTick, linkTick });
@@ -851,7 +856,7 @@ export function App() {
   })) : [];
   const moreBase = alertsOffDot ? t("More · alerts are off") : t("More");
   const moreLabel = waitingInMore ? `${moreBase} · ${t("{count} waiting for you", { count: moreWaiting })}` : moreBase;
-  const findInTerminal: RowMenuItem[] = selectedPane && !selectedPane.restore_error ? [{ id: "find", label: t("Find in terminal"), icon: Search, run: actions.openFind }] : [];
+  const findInTerminal: RowMenuItem[] = selectedPane && !selectedPane.restore_error && gg.target === null ? [{ id: "find", label: t("Find in terminal"), icon: Search, run: actions.openFind }] : [];
   const findGroup = [...findInTerminal, ...paneMoreItems.filter((item) => item.id === "search-conversation")].map((item) => ({ ...item, divider: false }));
   const paneGroup = paneMoreItems.filter((item) => item.id !== "search-conversation" && !item.id.startsWith("pane:"));
   const foldFind = isSheetWidth && findGroup.length > 1;
@@ -866,7 +871,7 @@ export function App() {
     ...(waitingInMore && nextWaiting !== null ? [{ id: "next-waiting", label: t("Open the next session waiting for you"), hint: String(moreWaiting), icon: CircleHelp, run: openNextWaiting }] : []),
     { id: "palette", label: t("Search panes and actions"), icon: Search, ...(paletteKeys ? { hint: paletteKeys } : {}), run: () => openPalette() },
     ...(foldFind && more ? [{ id: "find-group", label: t("Find…"), icon: TextSearch, run: () => openMoreGroup("find", more.anchor) }] : findInTerminal),
-    ...(selectedPane && (!wideScreen || inMode) ? [{ id: "files", label: t("Browse files"), icon: FolderOpen, run: moreFilesRun(actions.counted, () => setFilesOpen(true)) }] : []),
+    ...(selectedPane && (!wideScreen || inMode) && gg.target === null ? [{ id: "files", label: t("Browse files"), icon: FolderOpen, run: moreFilesRun(actions.counted, () => setFilesOpen(true)) }] : []),
     { id: "copy-link", label: t("Copy link"), icon: Link, run: () => void copyText(window.location.href).then((ok) => { if (ok) setHeaderNote("copied"); }) },
     { id: "alerts", label: t("Alerts"), hint: bell.state, checked: bell.on, title: bell.title, icon: Bell, run: () => void bell.run() },
     ...paneMoreItems.filter((item) => !(foldFind && item.id === "search-conversation") && (!foldPane || item.id.startsWith("pane:")))
@@ -1036,12 +1041,12 @@ export function App() {
           </button>}
         </div>
         <HeaderNote note={herdrPrefixWaiting ? t("herdr prefix: press a key") : note} />
-        {stripInHeader ? (
+        {gg.target !== null ? <GgOverviewTitle target={gg.target} /> : stripInHeader ? (
           <div className={`header-tabs${phoneTabRow ? " is-phone" : ""}`}>
             <RenderBoundary resetKey={`${selectedMachineId}:${selectedPane.pane_id}`} fallback={(retry) => <RegionCrash message={t("This pane can't be shown.")} retry={retry} />}>
             <PanePressContext.Provider value={pressPane}>
               <TabStrip snapshot={snapshot} workspace={selectedWorkspace} selectedPane={selectedPane} onSelectPane={selectPane} splitDrag={!phoneTabRow} browserTabs={!phoneTabRow} phoneRow={phoneTabRow}
-                sheet={phoneTabRow ? tabSheet : null} onSheetClose={closeTabSheet} closable={auth?.role !== "watch"}
+                sheet={phoneTabRow ? tabSheet : null} onSheetClose={closeTabSheet} closable={auth?.role !== "watch"} overview={gg.tabOverview(selectPane, selectedPane.pane_id, selectedMachineId, selectedWorkspace.workspace_id)}
                 renameRequest={renameRequest?.machineId === selectedMachineId && renameRequest.paneId === selectedPane.pane_id ? renameRequest : null}
                 onRenameHandled={clearRenameRequest}
                 closeRequest={closeTabRequest?.machineId === selectedMachineId && closeTabRequest.paneId === selectedPane.pane_id ? closeTabRequest : null}
@@ -1105,11 +1110,11 @@ export function App() {
         ) : (
           <><Brand /><span className="machine-context-name">{selectedMachine?.name ?? selectedMachineId}</span></>
         )}
-        {selectedPane && (isSheetWidth || inMode) && !inbox.shown && (
+        {selectedPane && gg.target === null && (isSheetWidth || inMode) && !inbox.shown && (
           <LensToggle view={view} peek={terminalPeek !== null} terminalAttach={terminalAttach} thread={inMode}
             title={(label) => shortcutTitle(label, "toggle-view")} onToggle={() => actions.toggleView("header")} />
         )}
-        {selectedPane && !isSheetWidth && !inMode && (
+        {selectedPane && gg.target === null && !isSheetWidth && !inMode && (
           <div className="view-switch" data-view={view} role="group" aria-label={`${t("Chat")} / ${t("Terminal")}`}>
             <button type="button" className="lens-option is-chat" aria-pressed={view === "chat"} aria-label={t("Chat")} title={shortcutTitle(t("Chat transcript"), "toggle-view")}
               onClick={() => { setView("chat", "header"); setDrawerOpen(false); }}>
@@ -1126,7 +1131,7 @@ export function App() {
             <span className="lens-thumb" aria-hidden="true" />
           </div>
         )}
-        {selectedPane && wideScreen && !inMode && (
+        {selectedPane && wideScreen && !inMode && gg.target === null && (
           <button type="button" className="header-text-button header-files-button is-icon" aria-label={t("Browse files")} title={t("Files")} aria-pressed={filesDocked ? filesBeside : undefined} onClick={toggleFiles}>
             <FolderOpen aria-hidden="true" />
           </button>
@@ -1184,7 +1189,7 @@ export function App() {
           {error && <div className="error-state" role="alert"><p>{error}</p><button className="btn" onClick={() => void load()}>{t("Retry")}</button></div>}
           <RenderBoundary resetKey={null} fallback={(retry) => <RegionCrash message={t("The sidebar can't be shown.")} retry={retry} />}>
             <CrashProbe region="sidebar" />
-            <ReorderContext.Provider value={reorderCoordinator}><MachineSidebar machines={sidebarMachines} allMachines={machines} watching={auth?.role === "watch"} appLayout={appLayoutOn} drawerOpen={drawerOpen} filterRequest={sidebarFilterRequest} selectedMachineId={selectedMachineId} selectedPaneId={selectedPaneId} activity={activity} actions={actions} onSelect={selectTarget} onUsageLogin={(paneId) => { selectTarget("local", paneId, "terminal"); void load(); }} onSetup={(machine, update = false) => { setUpdateRemote(update); setMachineDialog(machine); }} onNew={openNewOn}
+            <ReorderContext.Provider value={reorderCoordinator}><MachineSidebar {...gg.sidebar} machines={sidebarMachines} allMachines={machines} watching={auth?.role === "watch"} appLayout={appLayoutOn} drawerOpen={drawerOpen} filterRequest={sidebarFilterRequest} selectedMachineId={selectedMachineId} selectedPaneId={selectedPaneId} activity={activity} actions={actions} onSelect={selectTarget} onUsageLogin={(paneId) => { selectTarget("local", paneId, "terminal"); void load(); }} onSetup={(machine, update = false) => { setUpdateRemote(update); setMachineDialog(machine); }} onNew={openNewOn}
               afterPcs={browserTabs !== null && filePanelAvailable ? <BrowserTabsGroup tabs={browserTabs} selected={browserTab} onSelect={openBrowserTab} /> : undefined}
               footerStart={setupRow} inbox={modeOffered && !inMode ? { waiting: sessionTally.waiting, open: () => { actions.counted?.("inbox", "button"); enterInbox(); } } : null} /></ReorderContext.Provider>
           </RenderBoundary>
@@ -1235,8 +1240,8 @@ export function App() {
           onPaired={() => void loadHealth()}
           onOpened={(paneId, agentStarted) => { if (agentStarted) actions.agentStarted("local", paneId);
             if (agentStarted && setupGuide.guide?.reopened !== true) { try { armHints(window.localStorage); } catch {} } setupGuide.finish(() => selectTarget("local", paneId)); void load(); }} /></MachineContext.Provider>}
-        {guideShown ? null :
-        <div ref={paneAreaRef} className={`pane-split${paneSplit ? " is-split" : ""}${inbox.shown ? " is-under-inbox" : ""}`} onDragEnterCapture={paneDragOver} onDragOverCapture={paneDragOver} onDragLeave={paneDragLeave} onDropCapture={paneDrop}>
+        {guideShown ? null : gg.target !== null ? <GgOverviewHost gg={gg} machines={machines} snapshot={snapshot} selectedMachineId={selectedMachineId} selectedPane={selectedPane} selectedWorkspace={selectedWorkspace} actions={actions} load={load} />
+        : <div ref={paneAreaRef} className={`pane-split${paneSplit ? " is-split" : ""}${inbox.shown ? " is-under-inbox" : ""}`} onDragEnterCapture={paneDragOver} onDragOverCapture={paneDragOver} onDragLeave={paneDragLeave} onDropCapture={paneDrop}>
           {inboxWide && <ThreadTop note={<HeaderNote note={herdrPrefixWaiting ? t("herdr prefix: press a key") : note} />}
             thread={!inbox.shown && selectedPane !== null && note === null ? { machines, activity, machineId: selectedMachineId, pane: selectedPane, connection: headerConnection, watching: viewOnly(selectedMachineId), severalPcs: sidebarMachines.length > 1 } : null}
             controls={!inbox.shown && selectedPane !== null ? <>
@@ -1308,7 +1313,7 @@ export function App() {
                 <CrashProbe region="pane" />
                 {!(slotSnapshot && pane && workspace) && slotBar}
                 {slotSnapshot && pane && workspace && !(active && classicStripInHeader) && !threadDrawn && (
-                  <TabStrip snapshot={slotSnapshot} workspace={workspace} selectedPane={pane} panelId={slotPanelId} splitDrag={wideScreen} browserTabs={paneSplit && wideScreen && !tabsInHeader} onSelectPane={onSelect}
+                  <TabStrip snapshot={slotSnapshot} workspace={workspace} selectedPane={pane} panelId={slotPanelId} splitDrag={wideScreen} browserTabs={paneSplit && wideScreen && !tabsInHeader} onSelectPane={onSelect} overview={gg.tabOverview(onSelect, pane.pane_id, machineId, workspace.workspace_id)}
                     inHeader={tabsInHeader} sheet={active ? tabSheet : null} onSheetClose={closeTabSheet} end={slotEnd} closable={auth?.role !== "watch"}
                     renameRequest={active && renameRequest?.machineId === machineId && renameRequest.paneId === pane.pane_id ? renameRequest : null}
                     onRenameHandled={clearRenameRequest}

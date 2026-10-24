@@ -1,6 +1,6 @@
 import { tally } from "../lib/usageCounters.ts";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
-import { Download, EyeOff, Inbox, Pencil, Plug, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, Unplug, X } from "lucide-react";
+import { Download, EyeOff, Inbox, LayoutDashboard, Pencil, Plug, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Trash2, Unplug, X } from "lucide-react";
 import { OWN_UPDATE_OFFER, pairedPc, type Machine, type MachineState, type MachineUpdate, type RemoteOvis } from "../../shared/machines.ts";
 import { copyText } from "../lib/clipboard.ts";
 import { AppLayoutContext, FULL_LAYOUT, MachineContext, type LayoutOffer } from "../lib/machineContext.tsx";
@@ -95,7 +95,7 @@ export const STATE_WORD: Readonly<Record<MachineState, string>> = {
   error: "Connection error",
 };
 
-interface Props { machines: Machine[]; footerStart?: ReactNode; inbox?: { waiting: number; open(): void } | null; afterPcs?: ReactNode; allMachines?: Machine[]; selectedMachineId: string; selectedPaneId: string | null; activity: SidebarActivity; actions: AppActions; watching?: boolean; appLayout?: (machineId: string) => LayoutOffer; drawerOpen?: boolean; filterRequest?: number; onSelect(machineId: string, paneId: string | null): void; onNew(machineId: string): void; onSetup(machine: Machine, update?: boolean): void; onUsageLogin(paneId: string): void }
+interface Props { machines: Machine[]; footerStart?: ReactNode; inbox?: { waiting: number; open(): void } | null; afterPcs?: ReactNode; allMachines?: Machine[]; selectedMachineId: string; selectedPaneId: string | null; activity: SidebarActivity; actions: AppActions; watching?: boolean; appLayout?: (machineId: string) => LayoutOffer; drawerOpen?: boolean; filterRequest?: number; overviewSelected?: boolean; onOverview?: () => void; onWorkspaceOverview?: (machineId: string, workspaceId: string, paneId: string) => void; onSelect(machineId: string, paneId: string | null): void; onNew(machineId: string): void; onSetup(machine: Machine, update?: boolean): void; onUsageLogin(paneId: string): void }
 export function MachineSidebar(props: Props) {
   const t = useT();
   const activity = props.activity;
@@ -258,6 +258,7 @@ export function MachineSidebar(props: Props) {
   const noMatchWords = useAnnouncedText(filter.active && filter.matches === 0 && props.machines.length > 0 ? `${t(unanswered ? "No workspaces or agents match on the PCs that answered" : "No workspaces or agents match")}\n${t("Try other words, or clear the filter.")}` : null);
   const agentList = <AgentSidebar key="agents" foldRequest={agentsFold} listId={agentsListId} machines={props.machines} selectedMachineId={props.selectedMachineId} selectedPaneId={props.selectedPaneId} stateWord={(machine) => t(STATE_WORD[machine.state])} watching={props.watching} onSelect={props.onSelect} />;
   return <SidebarActivityProvider value={activity}><SidebarFilterProvider value={filterView}><div ref={shell} className={`sidebar-shell${order === "agents" ? " is-agents-first" : ""}`} onBlur={onSidebarBlur} onKeyDown={stepRows}>
+    {props.onOverview && !props.watching && <button type="button" className="gg-overview-nav" aria-current={props.overviewSelected ? "page" : undefined} onClick={props.onOverview}><LayoutDashboard aria-hidden="true" /><span>Globális áttekintés</span></button>}
     {filterShown && <div className="sidebar-filter" role="search" aria-label={t("Filter workspaces and agents")}>
       <Search className="sidebar-filter-glass" aria-hidden="true" />
       <input ref={filterInput} id={filterId} className="input sidebar-filter-input" type="search" value={query} aria-label={t("Filter workspaces and agents")} placeholder={t("Filter workspaces and agents")} list={suggestionsId} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} enterKeyHint="search" onChange={(event) => setQuery(event.target.value)} onKeyDown={onFilterKeyDown} />
@@ -509,7 +510,7 @@ function MachineGroup({ machine, headerless = false, canHide, onHide, ...props }
     {error && <p className="machine-error" role="alert">{error}</p>}
     {!quiet && !folded && !online && !machine.snapshot && (machine.state === "disconnected" || machine.state === "error") && <p className="tree-state machine-empty" role="status">{t("No saved sessions")}</p>}
     {(!folded || filtered !== null) && (machine.snapshot !== null || online) && <div className={online ? "" : "machine-offline"} inert={!online} hidden={folded}>
-      <MachineContext.Provider value={machine.id}><AppLayoutContext.Provider value={props.appLayout?.(machine.id) ?? FULL_LAYOUT}><Sidebar snapshot={machine.snapshot} online={online} selectedPaneId={props.selectedMachineId === machine.id ? props.selectedPaneId : null} actions={actions} watching={props.watching} /></AppLayoutContext.Provider></MachineContext.Provider>
+      <MachineContext.Provider value={machine.id}><AppLayoutContext.Provider value={props.appLayout?.(machine.id) ?? FULL_LAYOUT}><Sidebar snapshot={machine.snapshot} online={online} selectedPaneId={props.selectedMachineId === machine.id ? props.selectedPaneId : null} actions={actions} watching={props.watching} onWorkspaceOverview={!props.watching && props.onWorkspaceOverview ? (workspaceId, paneId) => props.onWorkspaceOverview?.(machine.id, workspaceId, paneId) : undefined} /></AppLayoutContext.Provider></MachineContext.Provider>
     </div>}
     {headerless && (!compact || drawer) && online && machine.snapshot?.workspaces.length !== 0 && !filter.active && <button type="button" className="machine-new-row" disabled={!canCreate} title={props.watching ? createTitle : undefined} onClick={() => props.onNew(machine.id)}><span className="sidebar-mark" aria-hidden="true"><Plus /></span><span className="machine-new-row-label">{t("New workspace")}</span></button>}
   </section>;

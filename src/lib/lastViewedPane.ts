@@ -1,9 +1,11 @@
 export type ViewedScope = "workspace" | "tab";
+// helyi GG-áttekintés: a munkaterület nézete (áttekintés vagy pane) külön kulcson
+type StoredScope = ViewedScope | "workspace-view";
 
 const KEY = "ovis:last-viewed-pane";
 const LIMIT = 200;
 
-const scopeKey = (scope: ViewedScope, machineId: string, id: string): string => `${scope}:${machineId}:${id}`;
+const scopeKey = (scope: StoredScope, machineId: string, id: string): string => `${scope}:${machineId}:${id}`;
 
 export function parseViewedPanes(raw: string | null): Map<string, string> {
   const parsed = new Map<string, string>();
@@ -45,10 +47,10 @@ export function viewedPanes(storage: () => ViewedStorage) {
     return entries;
   };
   return {
-    get(scope: ViewedScope, machineId: string, id: string): string | undefined {
+    get(scope: StoredScope, machineId: string, id: string): string | undefined {
       return (entries ?? fresh()).get(scopeKey(scope, machineId, id));
     },
-    remember(scope: ViewedScope, machineId: string, id: string, paneId: string): void {
+    remember(scope: StoredScope, machineId: string, id: string, paneId: string): void {
       const key = scopeKey(scope, machineId, id);
       const current = fresh();
       if ([...current.keys()].at(-1) === key && current.get(key) === paneId) return;

@@ -47,6 +47,8 @@ const EMPTY_WORKSPACE_TARGETS: ReadonlySet<string> = new Set();
 const said = (reason: unknown): string => reason instanceof ApiError ? reason.detail : reason instanceof Error ? reason.message : String(reason);
 
 export interface TabStripProps {
+  /** Saját GG-kiegészítés: rögzített virtuális tab, natív tab-létrehozás nélkül. */
+  overview?: { selected: boolean; onSelect(): void };
   snapshot: SessionSnapshot;
   workspace: WorkspaceInfo;
   selectedPane: PaneInfo;
@@ -77,7 +79,7 @@ const LONG_PRESS_SLOP = 8;
 /** the click a lifted long press still sends is the press's, not a pick; a later one (a key, a mouse) is a pick again */
 const LONG_PRESS_CLICK_MS = 600;
 
-export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNewTab, onNewTerminal, onMoveToWorkspace, paneActions, panelId = PANE_TABPANEL_ID, splitDrag = false, renameRequest = null, onRenameHandled, closeRequest = null, onCloseHandled, end, inHeader = false, sheet = null, onSheetClose, browserTabs = false, closable = true, phoneRow = false }: TabStripProps) {
+export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNewTab, onNewTerminal, onMoveToWorkspace, paneActions, panelId = PANE_TABPANEL_ID, splitDrag = false, renameRequest = null, onRenameHandled, closeRequest = null, onCloseHandled, end, inHeader = false, sheet = null, onSheetClose, browserTabs = false, closable = true, phoneRow = false, overview }: TabStripProps) {
   const t = useT();
   const { settings } = useSettings();
   const machineId = useMachineId();
@@ -340,7 +342,7 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
   // browser's: moved by deltaY alone, the strip would go against the swipe's sideways part (#2103).
   // React's own onWheel is passive, so the listener is the strip's own; `end` coming or going (a
   // split opened or closed) draws the strip as a new node, which needs it again.
-  const tabsHidden = !phoneRow && tabRowHidden(cramped, tabs.length, inHeader);
+  const tabsHidden = !phoneRow && tabRowHidden(cramped, tabs.length, inHeader) && !overview;
   const currentTabs = useRef(tabs);
   currentTabs.current = tabs;
   const openLongPress = (pressed: NonNullable<typeof longPress.current>, anchor: HTMLElement, tab: HerdrTab, active: boolean): void => {
@@ -651,9 +653,10 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
         onPointerDownCapture={(event) => { if (event.currentTarget.contains(event.target as Node)) typingAtPress.current = typingInPane(); }} aria-label={t("Tabs of {workspace}", { workspace: workspace.label })} aria-busy={reorder.moving} onKeyDown={onKeyDown} onScroll={onScroll}
         onFocus={(event) => { if (event.target.getAttribute("role") === "tab") focusedTab.current = event.target; }}
         onBlur={(event) => { if (event.relatedTarget !== null) focusedTab.current = null; }}>
+        {overview && <div className={`tab-strip-item${overview.selected ? " is-active" : ""}`}><button type="button" role="tab" className="tab-strip-tab" aria-selected={overview.selected} aria-controls={panelId} tabIndex={overview.selected ? 0 : -1} onClick={overview.onSelect}>Áttekintés</button></div>}
         {tabs.map((tab, index) => {
           if (inRow !== null && !inRow.has(index)) return null;
-          const active = tab.tab_id === selectedPane.tab_id;
+          const active = !overview?.selected && tab.tab_id === selectedPane.tab_id;
           const own = panesOf(tab);
           const status = statusOf(tab);
           const agent = chipAgentOf(tab);
@@ -743,7 +746,7 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
                       return;
                     }
                     const pane = paneFor(tab);
-                    if (pane && pane.pane_id !== selectedPane.pane_id) onSelectPane(pane.pane_id);
+                    if (pane && (overview?.selected || pane.pane_id !== selectedPane.pane_id)) onSelectPane(pane.pane_id);
                   }}
                   onDoubleClick={!renameOffered || !closable ? undefined : () => beginRename(tab)}
                   onContextMenu={(event) => {

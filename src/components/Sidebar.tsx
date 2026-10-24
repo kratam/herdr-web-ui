@@ -241,6 +241,8 @@ interface ConfirmState { title: string; body: string; action?: string; run: () =
   closes?: CloseScope; escalation?: { label: string; code: string; run: () => Promise<void> } }
 
 export interface SidebarProps {
+  /** Saját GG-áttekintő megnyitása a workspace nevére kattintva. */
+  onWorkspaceOverview?: (workspaceId: string, paneId: string) => void;
   snapshot: SessionSnapshot | null;
   online: boolean;
   selectedPaneId: string | null;
@@ -249,7 +251,7 @@ export interface SidebarProps {
   watching?: boolean;
 }
 
-export function Sidebar({ snapshot, online, selectedPaneId, actions, watching = false }: SidebarProps) {
+export function Sidebar({ snapshot, online, selectedPaneId, actions, watching = false, onWorkspaceOverview }: SidebarProps) {
   const t = useT();
   const { settings } = useSettings();
   const twoLine = settings.sidebarRows === "two";
@@ -859,7 +861,7 @@ export function Sidebar({ snapshot, online, selectedPaneId, actions, watching = 
           aria-expanded={foldable ? !rowFolded : undefined}
           title={[`${pane.pane_id} — ${rowTitle}`, branchNote, ...paths, paneTitle(pane), agentsTitle(workspace)].filter(Boolean).join(" — ")}
           onPointerDown={(event) => { if (event.button === 0 && !event.ctrlKey && !selected && pane.agent != null) pressPane?.(machineId, pane.pane_id); }}
-          onClick={() => { if (foldable) toggleFold(); else actions.selectPane(pane.pane_id); }}
+          onClick={() => { if (foldable) toggleFold(); else if (onWorkspaceOverview) onWorkspaceOverview(workspace.workspace_id, pane.pane_id); else actions.selectPane(pane.pane_id); }}
           onKeyDown={(event) => {
             onRowKeyDown(event, workspace.workspace_id);
             if (event.defaultPrevented) return;
@@ -870,7 +872,7 @@ export function Sidebar({ snapshot, online, selectedPaneId, actions, watching = 
             }
             if (event.key !== "Enter" && event.key !== " ") return;
             event.preventDefault();
-            if (foldable) toggleFold(); else actions.selectPane(pane.pane_id);
+            if (foldable) toggleFold(); else if (onWorkspaceOverview) onWorkspaceOverview(workspace.workspace_id, pane.pane_id); else actions.selectPane(pane.pane_id);
           }}
         >
           {/* a compact top-level row keeps its face alone; a worktree, which has none, keeps its mark */}
