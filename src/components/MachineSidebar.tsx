@@ -13,6 +13,7 @@ import { AgentSidebar } from "./AgentSidebar.tsx";
 import { SidebarActivityProvider, type SidebarActivity } from "../lib/sidebarActivity.tsx";
 import { filterSuggestions, machineFilter, sidebarFilter, type SidebarBranchLabels } from "../lib/sidebarFilter.ts";
 import { SidebarFilterProvider, useSidebarFilter } from "../lib/sidebarFilterContext.ts";
+import { GgHostLoads } from "./GgHostLoads.tsx";
 import { UsageMeters } from "./UsageMeters.tsx";
 import "./Machines.css";
 import { useT } from "../lib/i18n.ts";
@@ -170,6 +171,7 @@ export function MachineSidebar(props: Props) {
       {/* browsers without an install prompt (iOS, plain HTTP) get the steps instead */}
       {!installed && <button className="btn btn-ghost sidebar-footer-action" aria-expanded={canInstall ? undefined : installHelpOpen} onClick={() => { if (canInstall) void install(); else setInstallHelpOpen(!installHelpOpen); }}><Download aria-hidden="true" />{t("Install app")}</button>}
       {!installed && !canInstall && installHelpOpen && <p className="sidebar-install-help" role="status">{help}</p>}
+      {!props.watching && <GgHostLoads machines={props.machines} />}
       <div className="sidebar-footer-row">
         <button className="btn btn-ghost sidebar-footer-action sidebar-footer-settings" aria-label={t("Settings")} title={t("Settings (⌘⇧,)")} onClick={props.actions.openSettings}><Settings aria-hidden="true" /></button>
         <UsageMeters />

@@ -19,7 +19,7 @@ def main():
             store.connection.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             store.connection.execute("SET LOCAL statement_timeout = '10s'")
             # A történeti brief/checkpoint/result nem terheli a child stdoutját és a méretkorlátot.
-            fields = ("id", "title", "state", "package_state", "story_identifier", "github_url", "working_repositories", "blocked_reason", "updated_at")
+            fields = ("id", "title", "state", "package_state", "story_identifier", "github_url", "working_repositories", "blocked_reason", "updated_at", "priority", "priority_source_updated_at")
             tasks = [{key: task.get(key) for key in fields} for task in store.tasks() if task.get("package_state") == "active"]
             # A CLI status csak az utolsó 100 (válaszolt és függő) kérdést adja. Itt az összes
             # aktív csomag nyitott kérdése kell; a túl nagy adathalmaz látható hiba, nem csonkolás.

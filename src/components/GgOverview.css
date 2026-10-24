@@ -71,3 +71,18 @@
   .gg-overview .gg-task-content { flex-basis: 100%; }
   .gg-overview .gg-task-actions { margin-left: auto; }
 }
+
+/* Natív listaszűrők: ugyanaz a kezelés globálisan és workspace-en belül. */
+.gg-work-toolbar, .gg-work-controls, .gg-work-custom { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); }
+.gg-work-toolbar { margin: var(--space-4) 0 var(--space-3); }
+.gg-work-list label { display: flex; flex-direction: column; gap: var(--space-1); color: var(--text-dim); font-size: var(--fs-xs); }
+.gg-work-list select, .gg-work-list input { min-height: 2.25rem; max-width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-elevated); color: var(--text); padding: var(--space-2); font: inherit; }
+.gg-work-list select:disabled { opacity: 0.5; }
+.gg-overview .gg-work-controls { flex-shrink: 1; max-width: 100%; }
+.gg-work-controls .btn { min-height: 2.25rem; font-size: var(--fs-xs); }
+.gg-work-custom { flex-basis: 100%; }
+.gg-overview .gg-priority-review { color: var(--accent); }
+.gg-work-list .gg-priority--1 { color: var(--status-blocked); }
+.gg-work-list .gg-priority--2 { color: var(--accent); }
+.gg-work-list .gg-priority--3 { color: var(--text); }
+.gg-work-list .gg-priority--4, .gg-work-list .gg-priority--0 { color: var(--text-dim); }
