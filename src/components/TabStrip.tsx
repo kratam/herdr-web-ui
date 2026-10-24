@@ -60,6 +60,8 @@ const HEADER_TABS_QUERY = "(min-width: 769px)";
 const said = (reason: unknown): string => reason instanceof ApiError ? reason.detail : reason instanceof Error ? reason.message : String(reason);
 
 export interface TabStripProps {
+  /** Saját GG-kiegészítés: rögzített virtuális tab, natív tab-létrehozás nélkül. */
+  overview?: { selected: boolean; onSelect(): void };
   snapshot: SessionSnapshot;
   workspace: WorkspaceInfo;
   selectedPane: PaneInfo;
@@ -92,7 +94,7 @@ export interface TabStripProps {
   closable?: boolean;
 }
 
-export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNewTab, onNewTerminal, onMoveToWorkspace, paneActions, panelId = PANE_TABPANEL_ID, splitDrag = false, renameRequest = null, onRenameHandled, end, inHeader = false, sheet = null, onSheetClose, browserTabs = false, closable = true }: TabStripProps) {
+export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNewTab, onNewTerminal, onMoveToWorkspace, paneActions, panelId = PANE_TABPANEL_ID, splitDrag = false, renameRequest = null, onRenameHandled, end, inHeader = false, sheet = null, onSheetClose, browserTabs = false, closable = true, overview }: TabStripProps) {
   const t = useT();
   const { settings } = useSettings();
   const machineId = useMachineId();
@@ -295,7 +297,7 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
   // browser's: moved by deltaY alone, the strip would go against the swipe's sideways part (#2103).
   // React's own onWheel is passive, so the listener is the strip's own; `end` coming or going (a
   // split opened or closed) draws the strip as a new node, which needs it again.
-  const tabsHidden = tabRowHidden(cramped, tabs.length, inHeader);
+  const tabsHidden = tabRowHidden(cramped, tabs.length, inHeader) && !overview;
   // a row that goes (a phone turned narrow) takes the menu it opened with it
   useLayoutEffect(() => {
     if (tabsHidden && editing === null) setPicker(null);
@@ -568,9 +570,10 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
       <div ref={strip} className="tab-strip" role="tablist" aria-label={t("Tabs of {workspace}", { workspace: workspace.label })} aria-busy={reorder.moving} onKeyDown={onKeyDown} onScroll={onScroll}
         onFocus={(event) => { if (event.target.getAttribute("role") === "tab") focusedTab.current = event.target; }}
         onBlur={(event) => { if (event.relatedTarget !== null) focusedTab.current = null; }}>
+        {overview && <div className={`tab-strip-item${overview.selected ? " is-active" : ""}`}><button type="button" role="tab" className="tab-strip-tab" aria-selected={overview.selected} aria-controls={panelId} tabIndex={overview.selected ? 0 : -1} onClick={overview.onSelect}>Áttekintés</button></div>}
         {tabs.map((tab, index) => {
           if (inRow !== null && !inRow.has(index)) return null;
-          const active = tab.tab_id === selectedPane.tab_id;
+          const active = !overview?.selected && tab.tab_id === selectedPane.tab_id;
           const own = panesOf(tab);
           // Settle each pane's wait before rolling up, so a sibling's RUN or DONE stays visible.
           const status = statusOf(tab);
@@ -638,7 +641,7 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
                     if (reorder.consumeClick(event.detail) || event.ctrlKey) return;
                     event.currentTarget.focus({ preventScroll: true });
                     const pane = paneFor(tab);
-                    if (pane && pane.pane_id !== selectedPane.pane_id) onSelectPane(pane.pane_id);
+                    if (pane && (overview?.selected || pane.pane_id !== selectedPane.pane_id)) onSelectPane(pane.pane_id);
                   }}
                   onDoubleClick={!renameOffered || !closable ? undefined : () => beginRename(tab)}
                   onContextMenu={(event) => { event.preventDefault(); openPicker(event, tab); }}
