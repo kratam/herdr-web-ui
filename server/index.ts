@@ -1,4 +1,7 @@
 import "./adopt-legacy-env.ts";
+import { GgHostLoads } from "./gg-host-load.ts";
+import { GgAttentionStore } from "./gg-attention.ts";
+import { GgWorkService } from "./gg-work.ts";
 import { GgOverviewService, handleGgOverviewRequest, liveRepositoryRoots } from "./gg-overview.ts";
 import { handleWorkspaceRequest } from "./workspace-routes.ts";
 import { connectionData, createCore, type SocketData } from "./core/index.ts";
@@ -154,6 +157,7 @@ export function createServer(
     usage?: UsageService;
     /** Saját GG-kiegészítés; a teszt a titok nélküli olvasót adja be. */
     ggOverview?: GgOverviewService;
+    ggWork?: GgWorkService;
     /** Tests supply an isolated proxy service, never a user's configured instance. */
     cliProxy?: CLIProxyService;
     /** Tests use a disposable credential home and stand-in CLI binaries. */
@@ -229,6 +233,8 @@ export function createServer(
   const cliProxyRoutes = new CLIProxyRoutes(cliProxy);
   const usageLogin = options.usageLogin ?? new UsageLoginService();
   const usage = options.usage ?? new UsageService(undefined, undefined, (refresh) => cliProxy.report(refresh));
+  const ggWork = options.ggWork ?? new GgWorkService(new GgAttentionStore(options.stateDir ?? defaultStateDir()));
+  const ggLoads = new GgHostLoads(async id => { if (!machines) throw Error("no_machines"); return machines.ggHostLoad(id); });
   const ggOverview = options.ggOverview ?? new GgOverviewService({ roots: liveRepositoryRoots });
   const voice = options.voice ?? new VoiceService({ stateDir, env: process.env, fetch });
   /** a login named here is taken as it is: a tagged node has none of its own to read (OVIS_TAILSCALE_OWNER) */
@@ -452,7 +458,19 @@ export function createServer(
       // the finishes read in some browser of this server; a watching device reads them and cannot add to them (above)
       if (pathname === "/api/seen") { setRequestRoute(pathname); return handleSeenRequest(request, seen); }
 
-      if (pathname === "/api/gg/overview") { setRequestRoute(pathname); bunServer.timeout(request, 60); return handleGgOverviewRequest(request, ggOverview, !readOnly && !bridgeAuthorized); }
+      if (pathname === "/api/gg/overview") { setRequestRoute(pathname); bunServer.timeout(request, 60); return handleGgOverviewRequest(request, ggOverview, !readOnly && !bridgeAuthorized, feed => ggWork.decorate(feed)); }
+      if (pathname === "/api/gg/work") {
+        setRequestRoute(pathname);
+        if (readOnly || bridgeAuthorized) return jsonResponse({ error: { code: "read_only", message: "Interaktív helyi hozzáférés szükséges." } }, 403);
+        if (request.method !== "PUT") return jsonResponse({ error: { code: "method_not_allowed", message: "Csak PUT támogatott." } }, 405);
+        return ggWork.handle(request, await ggOverview.read(), true);
+      }
+      if (pathname === "/api/gg/host-loads") {
+        setRequestRoute(pathname);
+        if (readOnly || bridgeAuthorized) return jsonResponse({ error: { code: "read_only", message: "Interaktív helyi hozzáférés szükséges." } }, 403);
+        if (request.method !== "GET") return jsonResponse({ error: { code: "method_not_allowed", message: "Csak GET támogatott." } }, 405);
+        return ggLoads.response(machines?.list() ?? [{ id: "local", state: "connected" }]);
+      }
       if (pathname === "/api/usage") { setRequestRoute(pathname); return handleUsageRequest(request, url, usage); }
       if (pathname === "/api/usage/login") { setRequestRoute(pathname); bunServer.timeout(request, 30); return usageLogin.handle(request, collector.trackPane); }
       if (pathname === "/api/cliproxy" || pathname.startsWith("/api/cliproxy/")) { bunServer.timeout(request, 60); return cliProxyRoutes.handle(request); }
