@@ -189,9 +189,9 @@ export function MachineSidebar(props: Props) {
     <footer className="sidebar-footer">
       {/* no Install app here: a page knows it is installed only in the app's own window, so a row kept
           showing in every tab. Settings → Phone & devices → Install offers it (SettingsDialog). */}
-      {!props.watching && <GgHostLoads machines={props.machines} />}
       <div className="sidebar-footer-row">
         <button className="btn btn-ghost sidebar-footer-action sidebar-footer-settings" aria-label={t("Settings")} title={t("Settings (⌘⇧,)")} onClick={props.actions.openSettings}><Settings aria-hidden="true" /></button>
+        {!props.watching && <GgHostLoads machines={props.machines} />}
         <UsageMeters watching={props.watching} onLocalLogin={props.watching ? undefined : props.onUsageLogin} />
       </div>
     </footer>
