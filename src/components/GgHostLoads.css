@@ -1,10 +1,41 @@
-.gg-host-loads { padding: var(--space-2) var(--space-3); border-top: 1px solid var(--border); font-size: var(--fs-xs); color: var(--text-dim); }
-.gg-host-loads-heading { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
-.gg-host-loads-heading svg { width: 1em; height: 1em; }
-.gg-host-load-row { display: flex; justify-content: space-between; gap: var(--space-2); padding: var(--space-1) 0; color: var(--text); font-variant-numeric: tabular-nums; }
-.gg-host-load-row > :first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gg-host-load-row > :last-child { flex: none; }
-.gg-host-load-row.is-stale { color: var(--text-dim); }
-.gg-host-load-row small { font-size: inherit; }
-
-.gg-host-load-row.is-high { color: var(--status-blocked); }
+/* A géplista sorrendjében, a heti limitek mellett; a nevek a részletekbe kerülnek. */
+.gg-host-loads { display: flex; flex: 0 1 auto; min-width: 0; max-width: 45%; }
+.gg-host-load-strip { display: flex; gap: var(--space-1); overflow-x: auto; }
+.gg-host-load-chip {
+  flex: 0 0 auto;
+  height: var(--control-h);
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.gg-host-load-chip.is-stale { color: var(--text-dim); }
+.gg-host-load-chip.is-high { color: var(--status-blocked); }
+.gg-host-load-chip[aria-expanded="true"] { background: var(--bg-hover); }
+@media (hover: hover) { .gg-host-load-chip:hover { background: var(--side-hover); } }
+@media (pointer: coarse) { .gg-host-load-chip { height: var(--touch-target); } }
+.gg-host-load-popover {
+  position: absolute;
+  inset-inline: var(--space-3);
+  bottom: calc(100% - var(--space-1));
+  z-index: var(--z-popover);
+  max-height: calc(var(--app-height, 100dvh) - 160px);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  overscroll-behavior: contain;
+  padding: var(--space-3);
+  background: var(--bg-panel);
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop);
+  color: var(--text);
+  font-size: var(--fs-xs);
+}
+.gg-host-load-popover p { margin: var(--space-2) 0 0; }
+.gg-host-load-chip:focus-visible { outline-offset: -2px; }
