@@ -288,10 +288,10 @@ export function MachineSidebar(props: Props) {
       {props.footerStart}
       {/* no Install app here: a page knows it is installed only in the app's own window, so a row kept
           showing in every tab. */}
-      {!props.watching && <GgHostLoads machines={props.machines} />}
       <div className="sidebar-footer-row">
         <button className="btn btn-ghost sidebar-footer-action sidebar-footer-settings" aria-label={t("Settings")} title={t("Settings (⌘⇧,)")} onClick={() => { tally(() => props.actions.counted?.("settings", "button")); props.actions.openSettings(); }}><Settings aria-hidden="true" /></button>
         {props.inbox && <InboxEntry {...props.inbox} />}
+      {!props.watching && <GgHostLoads machines={props.machines} />}
         <UsageMeters watching={props.watching} onLocalLogin={props.watching ? undefined : props.onUsageLogin} />
       </div>
     </footer>
