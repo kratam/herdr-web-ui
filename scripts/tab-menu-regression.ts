@@ -380,6 +380,9 @@ async function checkDesktop(browser: Browser, origin: string, first: string, sec
     const keyboardTarget = await tabCreate({ workspaceId: nativeTab.workspace_id, label: "keyboard-close-target" });
     const keyboardTab = strip.locator(`[data-tab-id=${JSON.stringify(keyboardTarget.tab.tab_id)}]`);
     await keyboardTab.waitFor();
+    const survivingTarget = await tabCreate({ workspaceId: nativeTab.workspace_id, label: "keyboard-close-survivor" });
+    const survivingTab = strip.locator(`[data-tab-id=${JSON.stringify(survivingTarget.tab.tab_id)}]`);
+    await survivingTab.waitFor();
     let releaseClose!: () => void;
     const closeGate = new Promise<void>((resolve) => { releaseClose = resolve; });
     let closeAnswered = false;
@@ -396,13 +399,23 @@ async function checkDesktop(browser: Browser, origin: string, first: string, sec
       await page.keyboard.press("Delete");
       await keyboardTab.waitFor({ state: "detached" });
       assert.equal(closeAnswered, false, "the close acknowledgement remains held");
-      await until(() => firstTab.evaluate((node) => node === document.activeElement), "native tab removal returns focus before its HTTP acknowledgement");
+      await until(() => survivingTab.evaluate((node) => node === document.activeElement), "native tab removal returns focus before its HTTP acknowledgement");
       await currentPane(page, first);
-      assert.equal(await strip.locator('[role="tab"][data-tab-id]').count(), 1);
+      assert.equal(await strip.locator('[role="tab"][data-tab-id]').count(), 2);
+      // A felhasználó az ACK előtt másik tabra lép; a késői válasz ezt nem írhatja felül.
+      await firstTab.focus();
+      const answered = page.waitForResponse((response) => response.request().method() === "POST" && new URL(response.url()).pathname.endsWith("/tab/close"));
       releaseClose();
       await until(() => closeAnswered, "the close acknowledgement is delivered");
-      assert.equal(await firstTab.evaluate((node) => node === document.activeElement), true, "acknowledgement preserves the surviving tab's focus");
-    } finally { releaseClose(); await page.unroute("**/api/tab/close"); }
+      await (await answered).finished();
+      await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+      assert.equal(await firstTab.evaluate((node) => node === document.activeElement), true, "a late acknowledgement preserves the user's newer tab focus");
+    } finally {
+      releaseClose();
+      await page.unroute("**/api/tab/close");
+      await tabClose(survivingTarget.tab.tab_id);
+    }
+    await survivingTab.waitFor({ state: "detached" });
 
 
     // An inactive pane is a menu target, not a focus change. Menu arrows and Escape never type.
