@@ -63,4 +63,9 @@ describe("GG canonical döntésválasz", () => {
     expect(mixed.binding.expected_plan_hashes).toEqual([{ plan_id: requestId, descriptor_hash: "c".repeat(64) }, { plan_id: taskId, descriptor_hash: "c".repeat(64) }]);
     expect(projectDecision({ ...question, purpose: "authorization", authorizations: [{ ...plan, expires_at: "2000-01-01T00:00:00Z" }] }).blocked_reason).toBe("expired_plan");
   });
+  it("a teljes jóváhagyandó műveletet megtartja, beleértve a környezetet, feltételeket és használati korlátot", () => {
+    const descriptor = { operation_name: "example.write", scope: { system: "example", environment: "production", resource_ids: [taskId] }, arguments: { target: "specific-target" }, preconditions: { revision: "b".repeat(40) }, max_uses: 100, cost_limit_units: 0 };
+    const view = projectDecision({ ...question, authorizations: [{ id: requestId, descriptor_hash: "c".repeat(64), expires_at: "2099-01-01T00:00:00Z", descriptor }] });
+    expect(view.plans[0]!.descriptor).toEqual(descriptor);
+  });
 });

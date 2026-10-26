@@ -47,7 +47,7 @@ export function projectDecision(value: unknown, now = Date.now()): GgDecisionDet
     const resources = object(descriptor.scope).resource_ids;
     return { id: plan.id, operation: String(descriptor.operation_name), expires_at: String(plan.expires_at),
       resources: Array.isArray(resources) ? resources.filter((entry): entry is string => typeof entry === "string") : [],
-      cost_limit: typeof descriptor.cost_limit_units === "number" ? descriptor.cost_limit_units : null, currency: text(descriptor.currency) };
+      cost_limit: typeof descriptor.cost_limit_units === "number" ? descriptor.cost_limit_units : null, currency: text(descriptor.currency), descriptor };
   });
   const refs = new Map<string, GgPrRef>();
   for (const plan of authorizations) {

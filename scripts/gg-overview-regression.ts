@@ -173,6 +173,7 @@ try {
   await page.waitForFunction(() => (document.querySelector('[aria-label="Prioritás · Tervezett munka"]') as HTMLSelectElement)?.value === "3" && !(document.querySelector('[aria-label="Prioritás · Tervezett munka"]') as HTMLSelectElement)?.disabled);
   assert.equal(priorityWrites, 2);
   await page.goto(`http://127.0.0.1:${server.port}/?ggOverview=global`);
+  await page.locator(".gg-runtime-summary > summary").click();
   await page.getByRole("link", { name: "gg-closed-fixture", exact: true }).waitFor();
   assert.equal(await page.getByRole("combobox", { name: "Prioritás · Tervezett munka", exact: true }).inputValue(), "3");
   await page.getByRole("link", { name: "gg-closed-fixture", exact: true }).click();
@@ -185,6 +186,7 @@ try {
   await page.route("**/api/gg/overview", route => route.fulfill({ json: { tasks: [], decisions: [], repositories: [], source: { observed_at: null, error: "Első forrásolvasás hibája" } } }));
   await page.goto(`http://127.0.0.1:${server.port}/?ggOverview=global`);
   await page.getByText("Első forrásolvasás hibája", { exact: true }).waitFor();
+  await page.locator(".gg-runtime-summary > summary").click();
   const firstFailureRow = page.locator("tr", { has: page.getByRole("link", { name: prefix, exact: true }) });
   assert.ok((await firstFailureRow.locator("td").nth(1).innerText()).startsWith("—"));
   assert.ok((await firstFailureRow.locator("td").nth(2).innerText()).startsWith("—"));

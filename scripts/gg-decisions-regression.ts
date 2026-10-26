@@ -18,7 +18,7 @@ let server: ReturnType<typeof createServer> | undefined, browser: Awaited<Return
 let workspace: string | undefined, discussionPane = "", creates = 0, prompts = 0;
 let live: DiscussionIdentity | null = null;
 const questions = [1, 2, 3].map(index => ({ id: `e604002f-2993-4675-9c68-4808a010f80${index}`, task_id: `01e66a97-c5de-4526-aad8-3d996843d69${index}`, story_identifier: `IT-${index}`, epoch: 1, source_revision: "a".repeat(64), question_key: "CORE-TEST-" + index,
-  state: "pending", text: ["Legyen egyszerűbb a nézet?", "Rövidebb legyen a lista?", "Ezt előbb beszéljük át?"][index - 1]!, response_type: "boolean", choices: [], proposal: { label: "Igen", rationale: "Gyorsabb átnézés." }, proposal_risk: { score: 4, explanation: "Visszafordítható változtatás." }, authorizations: [] }));
+  state: "pending", text: ["Legyen egyszerűbb a nézet?", "Rövidebb legyen a lista?", "Ezt előbb beszéljük át?"][index - 1]!, response_type: "boolean", choices: [], proposal: { label: "Igen", rationale: "Gyorsabb átnézés." }, proposal_risk: { score: 4, explanation: "Visszafordítható változtatás." }, authorizations: index === 3 ? [{ id: "8752423d-9ea7-4ad8-b2df-062be6a7f6d4", descriptor_hash: "c".repeat(64), expires_at: "2099-01-01T00:00:00Z", descriptor: { operation_name: "example.publish", scope: { system: "fixture", environment: "production", resource_ids: ["fixture-only"] }, arguments: { target: "fixture-only" }, preconditions: { revision: "v1" }, max_uses: 100, cost_limit_units: 0 } }] : [] }));
 const writes: Record<string, unknown>[] = [];
 try {
   const created = await workspaceCreate({ cwd: root, label: "gg-decisions-fixture" }); workspace = created.workspace.workspace_id;
@@ -38,7 +38,7 @@ try {
     inspect: async () => live,
     choose: async () => ({ kind: "claude", args: [] }),
     create: async () => { creates++; const tab = await tabCreate({ workspaceId: workspace!, cwd: root, label: "Döntések átbeszélése" }); discussionPane = tab.root_pane.pane_id; return { pane_id: discussionPane, terminal_id: tab.root_pane.terminal_id! }; },
-    start: async () => { const pane = (await sessionSnapshot()).panes.find(pane => pane.pane_id === discussionPane)!; live = { pane_id: discussionPane, terminal_id: pane.terminal_id!, agent: "claude", name: "gg-decisions", process_pid: 123, process_birth: 456, session: "test-session" }; return true; },
+    start: async (_pane, _agent, name) => { const pane = (await sessionSnapshot()).panes.find(pane => pane.pane_id === discussionPane)!; live = { pane_id: discussionPane, terminal_id: pane.terminal_id!, agent: "claude", name, process_pid: 123, process_birth: 456, session: "test-session" }; return true; },
     queue: async () => { prompts++; return true; },
   });
   server = createServer({ port: 0, hostname: "127.0.0.1", token: "", stateDir: join(root, "state"), ggOverview: overview, ggDecisions: service, ggDiscussion: discussion, herdrProfiles: async () => [] });
@@ -69,6 +69,11 @@ try {
   assert.equal(writes[2]!.request_key, writes[3]!.request_key, "ugyanaz a válasz ugyanazt a mentést ellenőrzi");
   assert.notEqual(writes[0]!.request_key, writes[1]!.request_key, "az átfogalmazás új válasz");
   await page.setViewportSize({ width: 1440, height: 900 });
+  await card(3).getByRole("button", { name: "Válaszolok", exact: true }).click();
+  await card(3).getByText("Mire vonatkozik a döntés?", { exact: true }).click();
+  await card(3).getByText("A teljes művelet, paraméterek és feltételek", { exact: true }).click();
+  const plan = await card(3).locator(".gg-decision-plan").innerText();
+  for (const fragment of ["production", "100 alkalommal", "fixture-only", '"preconditions"', '"arguments"']) assert.ok(plan.includes(fragment), fragment);
   if (process.env.CHECK_BROWSER_EVIDENCE_DIR) await page.screenshot({ path: join(process.env.CHECK_BROWSER_EVIDENCE_DIR, "gg-decision-desktop.png"), fullPage: true });
   await card(3).getByRole("button", { name: "Beszéljük át" }).click();
   await page.locator(".gg-decisions").waitFor({ state: "detached" });

@@ -35,7 +35,7 @@ export function discussionRuntime(root: string, usage: UsageService, queue: (pan
       if (!created.root_pane.terminal_id) throw Error("discussion_start_unconfirmed");
       return { pane_id: created.root_pane.pane_id, terminal_id: created.root_pane.terminal_id };
     },
-    start: async (paneId, agent) => (await agentLaunch(paneId, { ...agent, name: "gg-decisions" })).agent_started,
+    start: async (paneId, agent, name) => (await agentLaunch(paneId, { ...agent, name })).agent_started,
     queue: async (pane, text, kind, requester, pid) => {
       const pending = await queue(pane, text, kind, requester, pid);
       return pending.state === "queued" || pending.state === "sending";

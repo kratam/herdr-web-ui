@@ -17,7 +17,9 @@ látható hiba, nem kitalált könyvtár vagy automatikus újrapróbálkozás.
 
 A **Válaszolok** a kiválasztott story pontos döntését frissen olvassa a kanonikus
 `autoagent_decisions` MCP-toollal. A javaslat, kockázat, PR-head és a terv lejárata
-ellenőrizhető. A választ a **Válasz rögzítése** menti a meglévő `session_reply`
+ellenőrizhető, az érintett rendszerrel/környezettel, használati és költségkorláttal
+együtt. A teljes művelet, paraméterek és előfeltételek is kibontva olvashatók.
+A választ a **Válasz rögzítése** menti a meglévő `session_reply`
 művelettel; a teljes nyers szöveg megmarad. A típusos feldolgozást, tulajdonost,
 epochot, forrásrevíziót, PR-headet és tervkötést a kanonikus rendszer ellenőrzi.
 Nincs közvetlen DB-írás vagy válaszként létrehozott Linear-komment.
@@ -30,6 +32,8 @@ idempotens kérést ellenőrzi. Mentés után a közös áttekintő cache érvé
 A **Beszéljük át** ugyanazt a **Döntések átbeszélése** Herdr-tabot használja, a
 `gg-agent-skills` konfigurált fő checkoutjában. Első kattintásra friss, ismert heti
 kerettel rendelkező normál agent indul; a meglévő beszélgetés nem vált modellt.
+Több mért fiók esetén abból a szolgáltatóból nem választ automatikusan: a mért
+fiókot a jelenlegi indító nem köti credential-profilhoz.
 A kontextust az Ovis meglévő, a böngésző és a futó session azonosságához kötött
 üzenetsora adja át. A tényleges emberi választ az agent-decisions skill kezeli.
 Interaktív koordinátorok saját kérdései továbbra is a saját beszélgetésükben maradnak.

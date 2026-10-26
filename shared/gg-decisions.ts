@@ -19,7 +19,7 @@ export interface GgDecisionDetail {
   proposal: string | null;
   rationale: string | null;
   risk: { score: number; explanation: string } | null;
-  plans: { id: string; operation: string; expires_at: string; resources: string[]; cost_limit: number | null; currency: string | null }[];
+  plans: { id: string; operation: string; expires_at: string; resources: string[]; cost_limit: number | null; currency: string | null; descriptor: Record<string, unknown> }[];
   blocked_reason: "expired_plan" | "decision_closed" | null;
 }
 export interface GgDecisionReply { binding: GgDecisionBinding; request_key: string; raw_text: string }

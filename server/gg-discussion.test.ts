@@ -19,7 +19,7 @@ function setup() {
     inspect: async () => live,
     create: async () => { creates++; return { pane_id: identity.pane_id, terminal_id: identity.terminal_id }; },
     choose: async () => ({ kind: "claude" as const, args: ["--model", "sonnet"] }),
-    start: async () => { starts++; live = identity; return true; },
+    start: async (_pane: string, _choice: unknown, name: string) => { starts++; live = { ...identity, name }; return true; },
     queue: async (_pane: string, prompt: string) => { prompts.push(prompt); return true; },
   };
   return { root, deps, service: new GgDiscussionService(root, deps), prompts, stats: () => ({ creates, starts }), replace: (next: DiscussionIdentity | null) => { live = next; } };
@@ -71,4 +71,22 @@ it("a bizonyítottan megtelt üzenetsor után későbbi kézi kérés újraprób
   const held = await fixture.service.open(question, "page"); expect(held.error).toBe("discussion_queue_full");
   fixture.deps.queue = async () => true;
   expect((await fixture.service.open(question, "page")).queued).toBeTrue(); expect(fixture.stats().creates).toBe(1);
+});
+it("hiányzó mapping javítása után indulhat; egyszeri indulás utáni olvasóhibából ugyanazt a sessiont állítja helyre", async () => {
+  const fixture = setup(), create = fixture.deps.create, inspect = fixture.deps.inspect;
+  fixture.deps.create = async () => { throw Error("discussion_workspace_missing"); };
+  await expect(fixture.service.open(question, "page")).rejects.toThrow("discussion_workspace_missing");
+  fixture.deps.create = create;
+  fixture.deps.inspect = async () => { throw Error("temporary rpc failure"); };
+  const first = await fixture.service.open(question, "page"); expect(first.error).toBe("discussion_start_unconfirmed");
+  fixture.deps.inspect = inspect;
+  const recovered = await fixture.service.open(question, "page"); expect(recovered.queued).toBeTrue();
+  expect(fixture.stats()).toEqual({ creates: 1, starts: 1 }); expect(fixture.prompts).toHaveLength(1);
+});
+it("második fiók szabad kerete nem indítja el az alapértelmezett, kimerült CLI-fiókot", () => {
+  const now = Date.now(), checked_at = new Date(now).toISOString();
+  const account = (id: "codex" | "claude", key: string, used_percent: number) => ({ id, key, account: null, plan: null, problem: null, checked_at, windows: [{ kind: "week" as const, scope: null, used_percent, resets_at: null, starts_at: null }] });
+  const codex = [account("codex", "default", 100), account("codex", "secondary", 5)];
+  expect(selectDiscussionAgent({ providers: [...codex, account("claude", "claude-default", 40)] }, now).kind).toBe("claude");
+  expect(() => selectDiscussionAgent({ providers: codex }, now)).toThrow("discussion_quota_unavailable");
 });

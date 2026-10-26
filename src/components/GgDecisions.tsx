@@ -83,7 +83,7 @@ function DecisionCard({ decision, task, unavailable, connection, openPane, saved
     {detail && <form className="gg-decision-form" onSubmit={event => { event.preventDefault(); void send(); }}>
       {detail.risk && <p>{risk(detail.risk.score)}{detail.risk.score} · {detail.risk.explanation}</p>}
       {detail.proposal && <p><strong>Javaslat:</strong> {detail.proposal}{detail.rationale ? " — " + detail.rationale : ""}</p>}
-      {(detail.plans.length > 0 || detail.binding.expected_pr_refs?.length) ? <details><summary>Mire vonatkozik a döntés?</summary><div className="gg-overview-details">{detail.binding.expected_pr_refs?.map(ref => <p key={ref.url}><a href={ref.url} target="_blank" rel="noreferrer">{ref.repository} PR</a><br /><code>{ref.head_sha}</code></p>)}{detail.plans.map(plan => <p key={plan.id}>{plan.operation}<br />Lejár: {new Date(plan.expires_at).toLocaleString("hu-HU")}<br />Érintett: {plan.resources.join(", ")}<br />Költséglimit: {plan.cost_limit ?? "nincs megadva"} {plan.currency}</p>)}</div></details> : null}
+      {(detail.plans.length > 0 || detail.binding.expected_pr_refs?.length) ? <details><summary>Mire vonatkozik a döntés?</summary><div className="gg-overview-details">{detail.binding.expected_pr_refs?.map(ref => <p key={ref.url}><a href={ref.url} target="_blank" rel="noreferrer">{ref.repository} PR</a><br /><code>{ref.head_sha}</code></p>)}{detail.plans.map(plan => <PlanDetails key={plan.id} plan={plan} />)}</div></details> : null}
       {detail.blocked_reason && <p className="gg-overview-warning">{detail.blocked_reason === "expired_plan" ? "A terv lejárt. A folytatást a Beszéljük át gombbal rendezhetjük." : "Ez a döntés már lezárult. Frissítsd az áttekintőt."}</p>}
       <div className="gg-decision-actions" role="group" aria-label="Válaszlehetőségek">{(detail.response_type === "boolean" ? [{ label: "Igen", value: "Igen" }, { label: "Nem", value: "Nem" }] : detail.choices).map(choice => <button type="button" className="btn btn-ghost" key={choice.value} disabled={disabled || Boolean(detail.blocked_reason)} onClick={() => setRaw(choice.value)}>{choice.label}</button>)}</div>
       <label htmlFor={"answer-" + decision.id}>Válaszod</label><textarea id={"answer-" + decision.id} value={raw} maxLength={16000} rows={3} disabled={Boolean(busy)} onChange={event => setRaw(event.target.value)} placeholder="Saját szavaiddal is válaszolhatsz." />
@@ -92,4 +92,10 @@ function DecisionCard({ decision, task, unavailable, connection, openPane, saved
     {status && <p className="gg-overview-warning" role="status">{status}</p>}
     {error && <p className="gg-overview-warning" role="alert">{error}{pane && <><br /><button className="gg-overview-link" onClick={() => openPane(pane.id, pane.started)}>Döntések átbeszélése · Tab megnyitása</button></>}</p>}
   </article>;
+}
+
+function PlanDetails({ plan }: { plan: GgDecisionDetail["plans"][number] }) {
+  const scope = plan.descriptor.scope && typeof plan.descriptor.scope === "object" ? plan.descriptor.scope as Record<string, unknown> : {};
+  return <div className="gg-decision-plan"><p>{plan.operation}<br />Rendszer: {String(scope.system ?? "nincs megadva")} · Környezet: {String(scope.environment ?? "nincs megadva")}<br />Lejár: {new Date(plan.expires_at).toLocaleString("hu-HU")}<br />Érintett: {plan.resources.join(", ")}<br />Felhasználható: {String(plan.descriptor.max_uses ?? "nincs megadva")} alkalommal<br />Költséglimit: {plan.cost_limit ?? "nincs megadva"} {plan.currency}</p>
+    <details><summary>A teljes művelet, paraméterek és feltételek</summary><pre>{JSON.stringify(plan.descriptor, null, 2)}</pre></details></div>;
 }

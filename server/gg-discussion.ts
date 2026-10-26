@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { unlinkSync } from "node:fs";
 import type { GgDecisionDetail, GgDiscussionReceipt } from "../shared/gg-decisions.ts";
 import type { UsageReport } from "../shared/usage.ts";
 import { readStateDocument, writeStateDocument } from "./state-document.ts";
@@ -12,12 +13,14 @@ export interface DiscussionDeps {
   inspect(paneId: string): Promise<DiscussionIdentity | null>;
   create(): Promise<{ pane_id: string; terminal_id: string }>;
   choose(): Promise<DiscussionAgent>;
-  start(paneId: string, agent: DiscussionAgent): Promise<boolean>;
+  start(paneId: string, agent: DiscussionAgent, name: string): Promise<boolean>;
   queue(paneId: string, prompt: string, kind: string, connection: string, pid: number): Promise<boolean>;
 }
 interface DiscussionState {
   version: 1;
-  phase: "creating" | "starting" | "running";
+  phase: "creating" | "starting" | "binding" | "running";
+  name: string;
+  agent: "claude" | "codex";
   pane: { pane_id: string; terminal_id: string } | null;
   identity: DiscussionIdentity | null;
   delivered: { key: string; instance: string; queued: boolean }[];
@@ -28,6 +31,9 @@ interface DiscussionState {
 export function selectDiscussionAgent(value: UsageReport, now: number): DiscussionAgent {
   const candidates = value.providers.filter(provider => {
     if (!["claude", "codex"].includes(provider.id) || provider.problem || !provider.checked_at) return false;
+    // Az indító nem választ credential-profilt. Több mért fiókból nem találjuk ki,
+    // melyiket örökölné a CLI; ilyen szolgáltatóból automatikusan nem indítunk.
+    if (new Set(value.providers.filter(row => row.id === provider.id).map(row => row.key)).size !== 1) return false;
     const age = now - Date.parse(provider.checked_at);
     if (!Number.isFinite(age) || age < -60_000 || age > 10 * 60_000) return false;
     const relevant = provider.windows.filter(window => window.scope === null || /sonnet/i.test(window.scope));
@@ -64,16 +70,23 @@ export class GgDiscussionService {
     if (doc.kind === "missing") return null;
     if (doc.kind !== "json" || !doc.value || typeof doc.value !== "object") throw Error("discussion_state_unavailable");
     const state = doc.value as DiscussionState;
-    if (state.version !== 1 || !["creating", "starting", "running"].includes(state.phase) || !Array.isArray(state.delivered)) throw Error("discussion_state_unavailable");
+    if (state.version !== 1 || !["creating", "starting", "binding", "running"].includes(state.phase) || typeof state.name !== "string" || !["claude", "codex"].includes(state.agent) || !Array.isArray(state.delivered)) throw Error("discussion_state_unavailable");
     return state;
   }
   private save(state: DiscussionState): void { writeStateDocument(this.path, JSON.stringify(state), false); }
+  private bind(state: DiscussionState, live: DiscussionIdentity): void {
+    if (!state.pane || live.pane_id !== state.pane.pane_id || live.terminal_id !== state.pane.terminal_id || live.agent !== state.agent || live.name !== state.name || !live.process_pid || !live.process_birth) throw Error("discussion_identity_changed");
+    state.identity = live; state.phase = "running"; this.save(state);
+  }
   private async openSerial(detail: GgDecisionDetail, connection: string): Promise<GgDiscussionReceipt> {
     let state = this.read();
     if (state?.pane) {
       const live = await this.deps.inspect(state.pane.pane_id);
       if (!live) state = null;
       else {
+        // Csak a Herdr által már nyugtázott indítást fejezhetjük be; az egyedi RPC-név
+        // a saját indításé, nem a felhasználó által szabadon átírható tabcím.
+        if (state.phase === "binding") this.bind(state, live);
         const bound = state.identity;
         if (state.phase !== "running" || !bound) return { pane_id: state.pane.pane_id, agent_started: false, queued: false, error: "discussion_start_unconfirmed" };
         const lease = (value: DiscussionIdentity) => ({ terminalId: value.terminal_id, agent: value.agent, processPid: value.process_pid, processBirth: value.process_birth, session: value.session });
@@ -83,15 +96,21 @@ export class GgDiscussionService {
     }
     if (!state) {
       const agent = await this.deps.choose();
-      state = { version: 1, phase: "creating", pane: null, identity: null, delivered: [], delivering: null };
+      state = { version: 1, phase: "creating", name: "gg-decisions-" + randomUUID(), agent: agent.kind, pane: null, identity: null, delivered: [], delivering: null };
       this.save(state);
-      state.pane = await this.deps.create();
+      try { state.pane = await this.deps.create(); }
+      catch (error) {
+        // A hiányzó mapping a runtime-ban minden Herdr-művelet ELŐTT derül ki.
+        if (error instanceof Error && error.message === "discussion_workspace_missing") unlinkSync(this.path);
+        throw error;
+      }
       state.phase = "starting"; this.save(state);
       try {
-        if (!await this.deps.start(state.pane.pane_id, agent)) throw Error("start_failed");
+        if (!await this.deps.start(state.pane.pane_id, agent, state.name)) throw Error("start_failed");
+        state.phase = "binding"; this.save(state);
         const live = await this.deps.inspect(state.pane.pane_id);
-        if (!live || live.terminal_id !== state.pane.terminal_id || live.agent !== agent.kind || live.name !== "gg-decisions" || !live.process_pid || !live.process_birth) throw Error("start_unconfirmed");
-        state.identity = live; state.phase = "running"; this.save(state);
+        if (!live) throw Error("start_unconfirmed");
+        this.bind(state, live);
       } catch { return { pane_id: state.pane.pane_id, agent_started: false, queued: false, error: "discussion_start_unconfirmed" }; }
     }
     if (!state.pane || !state.identity) throw Error("discussion_start_unconfirmed");
