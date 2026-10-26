@@ -10,6 +10,7 @@ import { PAGES, SETTINGS, openPalette, openSettings } from "./settings-pages-har
 import { KO } from "../src/lib/i18n.ko.ts";
 import { JA } from "../src/lib/i18n.ja.ts";
 import { ZH } from "../src/lib/i18n.zh.ts";
+import { SHEET_HISTORY_KEY } from "../src/lib/historyKeys.ts";
 
 // Settings found through the command palette, on the unmodified app over the demo's fixture
 // transport: what a user types for a setting, in each language, opens its page and its group. All
@@ -128,6 +129,12 @@ async function settingsSearch(browser: import("playwright-core").Browser, url: s
           // the next row opens Settings again: its close's step back lands first
           await page.waitForFunction(() => (history.state as Record<string, unknown> | null)?.["ovis:settings"] === undefined);
         };
+        const closePalette = async (): Promise<void> => {
+          await page.keyboard.press("Escape");
+          await page.locator(".command-palette").waitFor({ state: "detached" });
+          // A mobil paletta eltűnése után az előzménylépés még folyamatban lehet.
+          await page.waitForFunction(key => !history.state?.[key], SHEET_HISTORY_KEY);
+        };
         for (const [rowLanguage, query, expectedPage, expectedSection] of MATRIX) {
           if (rowLanguage !== language) continue;
           const before = await focusName(page);
@@ -154,8 +161,7 @@ async function settingsSearch(browser: import("playwright-core").Browser, url: s
             overflow = await sideways(page);
             await close();
           } else {
-            await page.keyboard.press("Escape");
-            await page.locator(".command-palette").waitFor({ state: "detached" });
+            await closePalette();
           }
           focusReturned = await focusName(page) === before;
           const pass = shown.page === expectedPage && (expectedSection === "-" || (shown.section === expectedSection && shown.visible === true)) && overflow.length === 0 && focusReturned;
@@ -167,8 +173,7 @@ async function settingsSearch(browser: import("playwright-core").Browser, url: s
           await openPalette(page, query);
           const settingsRows = await page.locator(".palette-section[data-section='settings-pages'] [role='option']").count();
           const overflow = await sideways(page);
-          await page.keyboard.press("Escape");
-          await page.locator(".command-palette").waitFor({ state: "detached" });
+          await closePalette();
           await openSettings(page);
           const opened = await landing(page, label);
           const steps: { page: string | null; section: string | null }[] = [opened];

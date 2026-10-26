@@ -262,7 +262,7 @@ async function checkDesktop(browser: Browser, origin: string, first: string, sec
     await strip.hover();
     assert.equal(await strip.locator(".tab-strip-item:not(.is-active) .tab-strip-menu").count(), 0, "an unselected tab draws no menu button, hovered or not");
     await pointerOffStrip();
-    const order = () => strip.getByRole("tab").evaluateAll((nodes) => nodes.map((node) => (node as HTMLElement).dataset["tabId"]));
+    const order = () => strip.locator('[role="tab"][data-tab-id]').evaluateAll((nodes) => nodes.map((node) => (node as HTMLElement).dataset["tabId"]));
     const originalOrder = [tabId, target.tab.tab_id];
     const movedOrder = [target.tab.tab_id, tabId];
     const firstTab = strip.locator(`[data-tab-id=${JSON.stringify(tabId)}]`);
@@ -279,6 +279,7 @@ async function checkDesktop(browser: Browser, origin: string, first: string, sec
     await frame(page, first).locator(".xterm-helper-textarea").focus();
     await dragInactiveBeforeFirst();
     await until(async () => JSON.stringify(await order()) === JSON.stringify(movedOrder), "a drag changes native tab order");
+    assert.equal(await strip.getByRole("tab").first().textContent(), "Áttekintés", "the virtual overview stays before the reordered native tabs");
     assert.deepEqual((await sessionSnapshot()).tabs.filter((entry) => entry.workspace_id === nativeTab.workspace_id).map((entry) => entry.tab_id), movedOrder);
     await currentPane(page, first);
     assert.equal((await sessionSnapshot()).focused_pane_id, first, "dragging an inactive tab preserves native pane focus");
@@ -432,7 +433,7 @@ async function checkDesktop(browser: Browser, origin: string, first: string, sec
       assert.equal(closeAnswered, false, "the close acknowledgement remains held");
       await until(() => firstTab.evaluate((node) => node === document.activeElement), "native tab removal returns focus before its HTTP acknowledgement");
       await currentPane(page, first);
-      assert.equal(await strip.getByRole("tab").count(), 1);
+      assert.equal(await strip.locator('[role="tab"][data-tab-id]').count(), 1);
       releaseClose();
       await until(() => closeAnswered, "the close acknowledgement is delivered");
       assert.equal(await firstTab.evaluate((node) => node === document.activeElement), true, "acknowledgement preserves the surviving tab's focus");
