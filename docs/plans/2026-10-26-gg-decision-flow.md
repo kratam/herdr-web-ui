@@ -59,7 +59,7 @@
 - [x] Interakciós próba előbb: helyben válasz → nyugta → lista frissül; ambiguous/hiba → válasz megmarad; beszélgetés → ugyanaz a pane.
 - [x] Globálisan és workspace-ben elöl az autonóm döntések, alattuk a meglévő munkák/állapot. Rövid kérdés, javaslat, kockázat; a valódi terv és PR-kötés elolvasható.
 - [x] Az alkalmazás meglévő agentbeszélgetését nyitjuk meg; saját chatmotor vagy automatikus modellezés nincs.
-- [ ] Célzott tesztek, typecheck/build, izolált böngészős próba, `bun run check fast`, friss független review. A célzott és böngészős ellenőrzések készek; a teljes fast-kör hibás, a review javításai visszaellenőrzésre várnak.
+- [ ] Célzott tesztek, typecheck/build, izolált böngészős próba, `bun run check fast`, friss független review. A célzott és böngészős ellenőrzések készek; a teljes fast-kör hibás. A kódreview javításai visszaellenőrizve, P1/P2 nincs; a telepítési út utolsó kompatibilitási javítása külön visszaellenőrzést kap.
 - [ ] Saját fork PR a `local/main-gg` ágra. Merge/telepítés csak a meglévő felhatalmazás tényleges feltételeivel; a felhasználói közös folyamatokat nem állítjuk le.
 
 ## Megkülönböztetett mellékszál
@@ -76,8 +76,15 @@ A teljes `bun run check fast` lefutott, de a 7265 tesztes unit-kör 18 hibás te
 és 2 külön hibával állt meg. Vannak macOS-parancseltérések, meglévő böngészős
 lane-regisztrációs hibák és időtúllépések; a teljes csomagot nem állítjuk zöldnek,
 és valamennyi hibát sem minősítjük igazolt baseline-nak. A saját döntési tesztek
-a teljes körben is átmentek. A forkban nincs GitHub Actions workflow.
+a teljes körben is átmentek. A kezdeti Actions workflow-listázás üres volt, de a PR megnyitásakor a célág workflow-i elindultak. A CI állapotát a PR tényleges checkjei igazolják; a kezdeti listából nem következett a CI hiánya.
 
 A független review négy P2-t jelzett: hiányzó mapping után újrapróbálás, igazolt
 agentindítás után átmeneti olvasóhiba, hiányzó műveleti részletek és több fióknál
 félreérthető keretválasztás. Mindegyik kapott célzott javítást és ellenőrzést.
+
+A helyi frissítő fájlonként is futtatja a módosult unit teszteket. Emiatt a
+böngésző-lane macOS-en hibás GNU `date -Is` hívása hordozható UTC-formátumra
+váltott; a meglévő helyi GG-böngészőpróbák felkerültek a manual listára, ahol
+az új próba is szerepel. Nem változott workflow, runner, párhuzamosság vagy
+böngészős futtatási lista. A meglévő hét lane-teszt az eredeti öt hibából zöldre
+váltott; a script-konvenciók is zöldek.
