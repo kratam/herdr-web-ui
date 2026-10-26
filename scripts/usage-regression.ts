@@ -66,9 +66,12 @@ export async function checkUsageMeters(browser: Browser, origin: string): Promis
     await settingsButton.click();
     await openSettingsPage(page, "Subscription usage");
     assert.equal(await toggle.getAttribute("aria-checked"), "false");
+    // A be- és kikapcsolás két külön mentés legyen, ne a debounce vonja össze őket.
+    const enabledSaved = page.waitForResponse(response => new URL(response.url()).pathname === "/api/preferences" && response.request().method() === "PUT" && response.request().postDataJSON()?.settings?.showUsage === true);
     await toggle.click();
     await page.keyboard.press("Escape");
     await strip.waitFor();
+    assert.equal((await (await enabledSaved).json()).settings.showUsage, true);
 
     // what is left of each plan's five-hour session by default, in the server's order; a plan
     // without a session shows its limit closest to running out, and the tooltip names another
@@ -171,11 +174,13 @@ export async function checkUsageMeters(browser: Browser, origin: string): Promis
     await page.getByRole("switch", { name: "Show plan limits", exact: true }).setChecked(true);
     await page.getByRole("button", { name: "Close settings", exact: true }).click();
     await page.getByRole("button", { name: "Open workspace list", exact: true }).click();
+    // A geometriai ellenőrzés a fiók becsúszása után értelmezhető.
+    await page.waitForFunction(() => document.querySelector(".sidebar.is-open")?.getAnimations().length === 0);
     await page.locator(".usage-strip").click();
     const popover = page.getByRole("dialog", { name: "Subscription usage", exact: true });
     await popover.waitFor();
     const box = await popover.boundingBox();
-    assert.ok(box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 390, "the popover stays inside the phone's screen");
+    assert.ok(box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 390, `the popover stays inside the phone's screen: ${JSON.stringify(box)}`);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     if (process.env.UI_EVIDENCE_DIR) await page.locator(".sidebar-shell").screenshot({ path: join(process.env.UI_EVIDENCE_DIR, "usage-popover-phone.png") });
 
