@@ -935,6 +935,9 @@ interface Search {
   sources: string[];
 }
 
+/** Egy CLI tényleges profiljának mérése és ugyanazon profil nem titkos indítási környezete. */
+export interface UsageLaunchProfile { usage: ProviderUsage; env: Record<string, string> }
+
 export class UsageService {
   /** A local CLI login ended: rediscover sign-ins, preserving account rate-limit backoffs. */
   invalidate(): void { this.searches.clear(); this.entries.clear(); }
@@ -961,6 +964,28 @@ export class UsageService {
     this.pending = pass;
     this.pendingRefresh = refresh;
     return pass;
+  }
+
+  /** A többfiókos kijelzőből nem következtetünk indítási profilra; csak a pontos forrást használjuk. */
+  async forLaunch(): Promise<UsageLaunchProfile[]> {
+    await this.report();
+    return (["codex", "claude"] as const).flatMap(id => {
+      const profile = this.launchSource(id)!;
+      const usage = this.entries.get(`${id}|${profile.source}`)?.usage;
+      return usage ? [{ usage, env: profile.env }] : [];
+    });
+  }
+
+  private launchSource(id: UsageProviderId): { source: string; env: Record<string, string> } | null {
+    if (id === "codex") {
+      const home = this.ctx.env["CODEX_HOME"] || join(this.ctx.home, ".codex");
+      return { source: home, env: { CODEX_HOME: home } };
+    }
+    if (id === "claude") {
+      const home = this.ctx.env["CLAUDE_CONFIG_DIR"] || "";
+      return { source: home || "default", env: { CLAUDE_CONFIG_DIR: home } };
+    }
+    return null;
   }
 
   private async collect(refresh: boolean): Promise<UsageReport> {
@@ -991,6 +1016,9 @@ export class UsageService {
 
     let found: Found[];
     try { found = await provider.signIns(this.ctx); } catch { found = []; }
+    // Azonos token több helyen: az indítandó CLI-profil maradjon a cache forrása.
+    const primary = this.launchSource(provider.id)?.source;
+    if (primary) found = [...found].sort((a, b) => Number(b.source === primary) - Number(a.source === primary));
     // the same token in two places is one sign-in
     const tokens = new Set<string>();
     found = found.filter((signIn) => "locked" in signIn || (!tokens.has(signIn.token) && Boolean(tokens.add(signIn.token))));

@@ -32,7 +32,7 @@ run_script() {
   UI_EVIDENCE_DIR="$evidence" bun "$@" 2>&1 | while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
       PASS\ *|FAIL\ *) printf '%s\n' "$line";;
-      *) printf '[%s] %s\n' "$(date -Is)" "$line";;
+      *) printf '[%s] %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$line";;
     esac
   done || code=$?
   local seconds=$((SECONDS - started))

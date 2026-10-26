@@ -168,7 +168,8 @@ try {
         // PC must never retarget the first PC's destructive dialog to that new machine.
         await page.keyboard.press("Escape"); await palette.waitFor({ state: "hidden" });
         const selectedTab = page.locator('.tab-strip-tab[aria-selected="true"]');
-        assert.equal(await page.locator('.tab-strip-tab').count(), 1, "the selected workspace owns only this tab");
+        assert.equal(await page.locator('.tab-strip-tab[data-tab-id]').count(), 1, "the selected workspace owns only this native tab");
+        assert.equal(await page.getByRole("tab", { name: "Áttekintés", exact: true }).count(), 1);
         const localTabId = await selectedTab.getAttribute("data-tab-id");
         await selectedTab.focus(); await selectedTab.press("Delete");
         const closeConfirm = page.getByRole("alertdialog", { name: /^Close tab / });

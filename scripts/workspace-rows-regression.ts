@@ -157,7 +157,8 @@ try {
   assert.equal(await page.locator(".workspace-contents, .sidebar-tab-heading, .sidebar-pane-item").count(), 0,
     "tabs and panes are navigated above the terminal rather than as workspace children");
   assert.equal(await page.locator(".tab-strip").count(), 1, "the native tab row remains over a lone pane's workspace");
-  assert.equal(await page.locator('.tab-strip [role="tab"]').count(), 1);
+  assert.equal(await page.locator('.tab-strip [role="tab"][data-tab-id]').count(), 1);
+  assert.equal(await page.getByRole("tab", { name: "Áttekintés", exact: true }).count(), 1);
   for (const fixture of [alpha, beta]) {
     const workspace = workspaceSelector(fixture.workspaceId);
     assert.equal(await page.locator(`${workspace} > .workspace-header`).count(), 1);
@@ -178,9 +179,9 @@ try {
   await page.evaluate((key) => localStorage.removeItem(key), singleFoldKey);
   // A split tab renders both panes. Selecting the second pane on the canvas changes only the
   // representative pane of the workspace row; the workspace's visible name remains its own.
-  await changeState(page, [{ selector: paneSelector(other.paneId), attribute: ["aria-current", "true"] }, { selector: '.tab-strip [role="tab"]', count: 1 }],
+  await changeState(page, [{ selector: paneSelector(other.paneId), attribute: ["aria-current", "true"] }, { selector: '.tab-strip [role="tab"][data-tab-id]', count: 1 }],
     () => page.locator(paneSelector(other.paneId)).click(), "selecting the split workspace shows its strip");
-  assert.equal(await page.locator('.tab-strip [role="tab"]').textContent(), "Tab 1", "a tab herdr named by its number reads as Tab 1");
+  assert.equal(await page.locator('.tab-strip [role="tab"][data-tab-id]').textContent(), "Tab 1", "a tab herdr named by its number reads as Tab 1");
   // at this width the header over the pane is the pane's surface, and the strip under it is
   // the same one, not a band of the panel's colour between header and pane
   const surfaces = await page.evaluate(() => {
