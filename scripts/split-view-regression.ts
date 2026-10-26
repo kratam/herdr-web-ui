@@ -339,8 +339,10 @@ export async function checkSplitView(browser: Browser, origin: string): Promise<
       const { page, errors } = await open([first, second, beside], "terminal");
       const area = page.locator(".pane-split");
       await page.waitForFunction(() => document.querySelectorAll(".pane-split .pane-terminal").length === 2);
-      const tabs = page.locator(".tab-strip [role=tab]");
+      // A rögzített GG-áttekintő nem Herdr-tab, és nem húzható egy terminálfélbe.
+      const tabs = page.locator(".tab-strip [role=tab][data-tab-id]");
       await tabs.nth(1).waitFor();
+      assert.equal(await tabs.count(), 2, "the fixture has two native tabs");
       const box = (await area.boundingBox())!;
       const tab = (await tabs.nth(1).boundingBox())!;
       await page.mouse.move(tab.x + tab.width / 2, tab.y + tab.height / 2);
@@ -356,7 +358,7 @@ export async function checkSplitView(browser: Browser, origin: string): Promise<
       assert.equal(await half(page, "left").locator(".pane-terminal").count(), 2, "the left half draws herdr's split of its tab");
       assert.equal(await half(page, "right").locator(".pane-terminal").count(), 1);
       // the other half's tab, picked in the active half's strip, opens in the active half as well
-      await half(page, "right").locator(".tab-strip [role=tab]").nth(0).click();
+      await half(page, "right").locator(".tab-strip [role=tab][data-tab-id]").nth(0).click();
       // (a canvas keeps tabs it showed mounted, inert: only the frames drawn count)
       await page.waitForFunction((pane) => document.querySelector(`.pane-slot[data-side="right"] [data-layout-pane="${pane}"]:not([inert])`) !== null, first);
       await isActive(page, "right");
@@ -364,7 +366,7 @@ export async function checkSplitView(browser: Browser, origin: string): Promise<
       assert.equal(await half(page, "right").locator("[data-layout-pane]:not([inert]) .pane-terminal").count(), 2, "the right half draws the left half's tab too");
       assert.equal(await half(page, "left").locator("[data-layout-pane]:not([inert]) .pane-terminal").count(), 2, "the left half keeps its tab");
       // Escape drops a tab drag (from the other half's strip) with nothing changed
-      const again = (await half(page, "right").locator(".tab-strip [role=tab]").nth(1).boundingBox())!;
+      const again = (await half(page, "right").locator(".tab-strip [role=tab][data-tab-id]").nth(1).boundingBox())!;
       await page.mouse.move(again.x + again.width / 2, again.y + again.height / 2);
       await page.mouse.down();
       await page.mouse.move(box.x + box.width * 0.2, box.y + box.height / 2, { steps: 8 });
