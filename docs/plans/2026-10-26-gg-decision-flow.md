@@ -18,7 +18,7 @@
 - Bizonytalan mentést/indítást nem ismétlünk automatikusan. A visszaküldött nyugta kötése ellenőrzött.
 - Egy közös döntési tab, kattintásra indítva, meglévőnél újrahasználva. A meglévő modell nem vált magától.
 - A prototípus tesztmentes volt; a valódi írás és indítás most célzott viselkedés-ellenőrzést kap.
-- Nincs core-foglalás, CI/VM-átállítás, közös szerverleállítás vagy idegen session kezelése.
+- Nincs core-foglalás, helyi CI/VM-átállítás, közös szerverleállítás vagy idegen session kezelése. Tamás külön jóváhagyásával a saját fork Linux CI-jének repóváltozója GitHub-hosted ubuntu-24.04-re irányít.
 
 ## Review Focus
 
@@ -59,12 +59,13 @@
 - [x] Interakciós próba előbb: helyben válasz → nyugta → lista frissül; ambiguous/hiba → válasz megmarad; beszélgetés → ugyanaz a pane.
 - [x] Globálisan és workspace-ben elöl az autonóm döntések, alattuk a meglévő munkák/állapot. Rövid kérdés, javaslat, kockázat; a valódi terv és PR-kötés elolvasható.
 - [x] Az alkalmazás meglévő agentbeszélgetését nyitjuk meg; saját chatmotor vagy automatikus modellezés nincs.
-- [ ] Célzott tesztek, typecheck/build, izolált böngészős próba, `bun run check fast`, friss független review. A célzott és böngészős ellenőrzések készek; a teljes fast-kör hibás. A kódreview javításai visszaellenőrizve, P1/P2 nincs; a telepítési út utolsó kompatibilitási javítása külön visszaellenőrzést kap.
-- [ ] Saját fork PR a `local/main-gg` ágra. Merge/telepítés csak a meglévő felhatalmazás tényleges feltételeivel; a felhasználói közös folyamatokat nem állítjuk le.
+- [x] Célzott tesztek, typecheck/build, izolált böngészős próba és friss független review elkészült. A korábbi helyi teljes fast-kör hibás; a hosted teljes kör az alább leírt platformfüggő teszt miatt bukott. A javítás visszaellenőrzése és a teljes CI kapu még folyamatban.
+- [x] Saját fork PR: https://github.com/kratam/herdr-web-ui/pull/1, a `local/main-gg` ágra.
+- [ ] Merge/telepítés a zöld CI és tiszta review után a meglévő felhatalmazással; a felhasználói közös folyamatokat nem állítjuk le.
 
 ## Megkülönböztetett mellékszál
 
-A telefonos agent-prep hiba külön diagnózis/javítás. 2026-10-26: a régi `autoagent_prep_list` próbakérés lejárt, claim-életjel nélkül; a jelenlegi `autoagent_intake` healthy. Tamás pontos hibaszövegét kértük, még nem érkezett meg. Ez önmagában nem bizonyítja a telefonos hiba okát.
+A telefonos agent-prep hiba külön diagnózis/javítás. 2026-10-26: Tamás két pontos requestKey-je a claim/heartbeat nélkül lejárt legacy `prep-list` parancsokra mutatott; a jelenlegi `autoagent_intake` healthy. A tool és a dokumentáció a mai olvasóhoz irányít: GuestGuru/gg-mcp PR276 merged és élesítve; 2060 teszt, CI, független review és friss éles olvasás igazolja. A legacy executor nem indult újra, a telefonos UI újrapróbáját nem állítjuk.
 
 ## Ellenőrzési állapot
 
@@ -88,3 +89,5 @@ váltott; a meglévő helyi GG-böngészőpróbák felkerültek a manual listár
 az új próba is szerepel. Nem változott workflow, runner, párhuzamosság vagy
 böngészős futtatási lista. A meglévő hét lane-teszt az eredeti öt hibából zöldre
 váltott; a script-konvenciók is zöldek.
+
+A GitHub-hosted Linux unit-kör 7257 sikeres, 1 hibás és 14 kihagyott teszttel futott le. A `local 0.4.8 object bindings` meglévő tesztje a futtató gép platformjára hagyatkozott, de nem-Macen is macOS Meta-kombinációkat várt. Az azonos fájl az alapágban is szerepelt; Linux platformmal helyben ugyanaz a hiba reprodukálható. A teszt most külön, explicit macOS és nem-macOS bemenettel ellenőrzi a bindolható kombinációk megőrzését és a nem támogatottak elhagyását. A működő kód nem változott; mindkét futtatási platformon 32/32 célzott teszt zöld.
