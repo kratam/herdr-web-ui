@@ -83,6 +83,9 @@ import type { UsageAccountList } from "./usage-account-list.ts";
 import { handleGgOverviewRequest, type GgOverviewService } from "./gg-overview.ts";
 import type { GgHostLoads } from "./gg-host-load.ts";
 import type { GgWorkService } from "./gg-work.ts";
+import type { GgDecisionService } from "./gg-decisions.ts";
+import type { GgDiscussionService } from "./gg-discussion.ts";
+import { handleGgDecisionRequest } from "./gg-decision-routes.ts";
 import { handleVoiceRequest } from "./voice.ts";
 import { handleMemoryRequest } from "./memory/routes.ts";
 import { BRIDGE_PROTOCOL } from "../shared/machines.ts";
@@ -168,6 +171,8 @@ export interface RequestServices {
   readonly ggOverview: GgOverviewService;
   readonly ggWork: GgWorkService;
   readonly ggLoads: GgHostLoads;
+  readonly ggDecisions: GgDecisionService;
+  readonly ggDiscussion: GgDiscussionService;
   readonly voice: VoiceService;
   /** Settings → Memory's notes for agents (server/memory/store.ts) */
   readonly memory: MemoryStore;
@@ -231,7 +236,7 @@ const tailscaleCli = (ctx: ServerContext): string | null => ctx.services.tailsca
 const OTHER_MACHINE_FILES = /^\/api\/(?:fs\/|pane\/(?:files|docs|image)$|workspace\/(?:diff\/|git\/|directories$|pr(?:$|\/)))/;
 
 export async function handleRequest(request: Request, ctx: ServerContext): Promise<Response | undefined> {
-  const { options, hostname, token, bridgeToken, bootId, devices, preferences, herdrSidebar, identityOf, serveOnly, portalGuards, shellAgents, agentDetector, agentOffered, agentInstaller, openCodeState, approvals, acp, cliProxyRoutes, usageLogin, usage, ggOverview, ggWork, ggLoads, voice, browserSnapshot, core, seen, piReader, orderSequence, clientConnectionLog, requestLog, portalStartupResult, portalStartup } = ctx.services;
+  const { options, hostname, token, bridgeToken, bootId, devices, preferences, herdrSidebar, identityOf, serveOnly, portalGuards, shellAgents, agentDetector, agentOffered, agentInstaller, openCodeState, approvals, acp, cliProxyRoutes, usageLogin, usage, ggOverview, ggWork, ggLoads, ggDecisions, ggDiscussion, voice, browserSnapshot, core, seen, piReader, orderSequence, clientConnectionLog, requestLog, portalStartupResult, portalStartup } = ctx.services;
   const { sidecar, serialize, push, alertWebhook, logPushError, omo, claudeAgents, opencodeAgents, plans, clientSnapshot, machines, broadcastAll, collector, queueFirstMessage, askFirstMessage } = core;
   return requestLog.handle(request, async (headers) => {
   if (options.profile === "machine") wordHerdrFailures(machineFailure, machineLayoutReason);
@@ -779,6 +784,10 @@ export async function handleRequest(request: Request, ctx: ServerContext): Promi
   if (pathname === "/api/system") { setRequestRoute(pathname); return handleSystemRequest(request, ctx.services.systemSampler); }
   if (pathname === USER_FONTS_PATH || pathname.startsWith(`${USER_FONTS_PATH}/`)) return handleUserFontsRequest(request, pathname, ctx.services.fontsDir, url.search);
   if (pathname === "/api/gg/overview") { setRequestRoute(pathname); ctx.timeout(request, 60); return handleGgOverviewRequest(request, ggOverview, !readOnly && !bridgeAuthorized, feed => ggWork.decorate(feed)); }
+  if (pathname.startsWith("/api/gg/decisions/")) {
+    setRequestRoute("/api/gg/decisions/:id"); ctx.timeout(request, 120);
+    return handleGgDecisionRequest(request, !readOnly && !bridgeAuthorized, ggDecisions, ggDiscussion, ggOverview);
+  }
   if (pathname === "/api/gg/work") {
     setRequestRoute(pathname);
     if (readOnly || bridgeAuthorized) return jsonResponse({ error: { code: "read_only", message: "Interaktív helyi hozzáférés szükséges." } }, 403);

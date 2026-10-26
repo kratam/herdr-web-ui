@@ -13,6 +13,7 @@ import type { PaneInfo, SessionSnapshot, WorkspaceInfo } from "../../shared/prot
 import type { AppActions } from "../lib/actions.ts";
 import type { GgOverview } from "../lib/useGgOverview.ts";
 import { GgTaskList } from "./GgTaskList.tsx";
+import { GgDecisions } from "./GgDecisions.tsx";
 import "./GgOverview.css";
 
 export interface GgOverviewTarget { machineId: string; workspaceId: string | null }
@@ -117,26 +118,25 @@ export function GgOverviewPanel({ target, cache, machines, onWorkspace, onPane, 
     {openError && <p className="error-state" role="alert">{openError}</p>}
     {agentError && workspaceMode && <p className="gg-overview-warning" role="status">{agentError}</p>}
     {launchNotice && <p className="gg-overview-warning" role="status">{launchNotice.text}{launchNotice.paneId && <button className="gg-overview-link" onClick={() => onAgentPane("local", launchNotice.paneId!, false)}>Tab megnyitása</button>}</p>}
+    {feed?.source.observed_at && <p className="gg-section-hint">Feladatsor lekérdezve: {new Date(feed.source.observed_at).toLocaleString("hu-HU")}{unavailable ? " · utolsó ismert adat" : ""}</p>}
     {!workspaceMode ? <>
+      <GgDecisions decisions={feed?.decisions ?? []} tasks={feed?.tasks ?? []} unavailable={unavailable || !known || !localOnline} refresh={() => cache.refresh(true)} openPane={(id, started) => onAgentPane("local", id, started)} />
+      <details className="gg-runtime-summary"><summary>Futó sessionök és workspace-ek · {groups.reduce((total, group) => total + group.agents.length, 0)} agent</summary>
       <div className="gg-overview-table"><table><thead><tr><th>Workspace / repository</th><th>Döntések</th><th>Munkák</th><th>Hibák</th></tr></thead><tbody>{groups.map(group => <tr key={group.key}>
         <td><a href="#gg-workspace" aria-busy={opening === group.key || undefined} onClick={event => { event.preventDefault(); void open(group); }}>{group.label}</a><small>{group.workspaceId === null ? "Nincs nyitott workspace" : group.online ? "Nyitott" : "Nem élő kapcsolat"}{group.machineId !== "local" ? " · " + (machines.find(machine => machine.id === group.machineId)?.name ?? group.machineId) : ""}</small></td>
         <td>{counts(group).decisions}{unavailable && group.machineId === "local" && known ? "*" : ""}<small>{group.agents.filter(pane => pane.status === "blocked").length} interaktív kérdés{!group.online && group.workspaceId !== null ? " · régi állapot" : ""}</small></td>
         <td>{counts(group).tasks}{unavailable && group.machineId === "local" && known ? "*" : ""}<small>{group.agents.length} élő agent{!group.online && group.workspaceId !== null ? " · régi állapot" : ""}</small></td>
         <td>{known || group.errors.length ? group.errors.length : "—"}{unavailable && known ? "*" : ""}</td>
-      </tr>)}</tbody></table></div>
+      </tr>)}</tbody></table></div></details>
       {feed && <section className="gg-overview-section"><h2>Minden munka <span className="gg-section-count">{feed.tasks.length}</span></h2><GgTaskList tasks={feed.tasks} cache={cache} disabled={unavailable} chip={chip} /></section>}
       {groups.length === 0 && <p className="gg-overview-empty">Nincs ismert workspace vagy tartós feladat.</p>}
     </> : selected ? <>
       {!selected.online && <p className="gg-overview-warning" role="status">A workspace kapcsolata nem élő; a pane-ek utolsó ismert állapotát látod.</p>}
-      <section className="gg-overview-section"><h2>Nyitott döntések</h2>
-        {selected.decisions.map(decision => <details key={decision.id}><summary>{decision.text}</summary><div className="gg-overview-details">{decision.proposal && <p>{decision.proposal}</p>}{external(decision.url, "Döntés megnyitása")}{!decision.url && external(selected.tasks.find(task => task.id === decision.task_id)?.url ?? null, "Kapcsolódó feladat")}</div></details>)}
-        {selected.agents.filter(pane => pane.status === "blocked").map(pane => <div className="gg-overview-item" key={pane.id}><span>Interaktív kérdés · {pane.title}</span>{paneLink(selected, pane.id, "Tab megnyitása")}</div>)}
-        {!selected.decisions.length && !selected.agents.some(pane => pane.status === "blocked") && <p className="gg-overview-empty">{known && !unavailable && selected.machineId === "local" ? "Nincs ismert nyitott döntés." : "A tartós döntési sor állapota nem ismert."}</p>}
-      </section>
+      <GgDecisions decisions={selected.decisions} tasks={selected.tasks} unavailable={unavailable || !known || selected.machineId !== "local" || !localOnline} refresh={() => cache.refresh(true)} openPane={(id, started) => onAgentPane("local", id, started)} />
       <section className="gg-overview-section"><h2>Munkák <span className="gg-section-count">{selected.tasks.length + selected.agents.length}</span></h2>
         {selected.tasks.some(task => task.url) && selected.machineId === "local" && <p className="gg-section-hint">A Codex / Claude gomb másolja az issue linkjét, és új agenttabot nyit. Beillesztés után hozzáírhatod az utasításodat.</p>}
         <GgTaskList tasks={selected.tasks} cache={cache} disabled={unavailable} chip={chip} actions={task => task.url && selected.machineId === "local" && <div className="gg-task-actions" role="group" aria-label={task.title + " megnyitása"}>{(["codex", "claude"] as const).map(kind => <button type="button" className="btn btn-ghost" key={kind} aria-label={(kind === "codex" ? "Codex" : "Claude") + " · " + task.title} disabled={opening !== null || !selected.online || !agents.includes(kind)} title={!selected.online ? "A workspace nem érhető el." : !agents.includes(kind) ? "Az agent nem érhető el ezen a gépen." : "Issue-link másolása és új " + (kind === "codex" ? "Codex" : "Claude") + " tab"} onClick={() => void launchIssue(task, kind)}><Terminal aria-hidden="true" />{kind === "codex" ? "Codex" : "Claude"}<ArrowUpRight aria-hidden="true" /></button>)}</div>} />
-        {selected.agents.map(pane => <div className="gg-overview-item" key={pane.id}><div>{paneLink(selected, pane.id, pane.title)}<small>{pane.agent} · élő agent</small></div>{chip(pane.status)}</div>)}
+        {selected.agents.map(pane => <div className="gg-overview-item" key={pane.id}><div>{paneLink(selected, pane.id, pane.title)}<small>{pane.agent} · {pane.status === "blocked" ? "Interaktív kérdés a saját beszélgetésében" : "élő agent"}</small></div>{chip(pane.status)}</div>)}
         {!selected.tasks.length && !selected.agents.length && <p className="gg-overview-empty">{known && !unavailable ? "Nincs ismert munka." : "A tartós feladatsor állapota nem ismert."}</p>}
       </section>
       <section className="gg-overview-section"><h2>Hibák</h2>{selected.errors.map(error => <div className="gg-overview-item" key={error.id}><span>{error.title}</span>{error.paneId ? paneLink(selected, error.paneId, "Tab megnyitása") : external(error.url ?? null, "Feladat megnyitása")}</div>)}{!selected.errors.length && <p className="gg-overview-empty">{known && !unavailable ? "Nincs ismert hiba." : "A tartós hibák állapota nem ismert. Élő restore-hiba nincs."}</p>}</section>

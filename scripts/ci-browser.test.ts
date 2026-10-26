@@ -195,6 +195,10 @@ describe("browser lane", () => {
 
 const MANUAL_BROWSER_SCRIPTS = [
   "scripts/pc-add-guidance-regression.ts", // requires UI_EVIDENCE_DIR; run for the localized PC-add captures
+  "scripts/gg-decisions-regression.ts", // Saját GG-kiegészítés; a helyi updater futtatja (docs/gg-overview.md).
+  "scripts/gg-overview-regression.ts",
+  "scripts/gg-work-access-regression.ts",
+  "scripts/palette-pane-shortcuts-demo-regression.ts",
   "scripts/android-ime-regression.ts", // an Android emulator over ADB (docs/terminal-input.md)
   "scripts/chat-browser-qa.ts",
   "scripts/font-swap-demo-regression.ts",

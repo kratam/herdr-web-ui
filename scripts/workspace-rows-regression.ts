@@ -152,7 +152,8 @@ try {
   assert.equal(await page.locator(".workspace-contents, .sidebar-tab-heading, .sidebar-pane-item").count(), 0,
     "tabs and panes are navigated above the terminal rather than as workspace children");
   assert.equal(await page.locator(".tab-strip").count(), 1, "the native tab row remains over a lone pane's workspace");
-  assert.equal(await page.locator('.tab-strip [role="tab"]').count(), 1);
+  assert.equal(await page.locator('.tab-strip [role="tab"][data-tab-id]').count(), 1);
+  assert.equal(await page.getByRole("tab", { name: "Áttekintés", exact: true }).count(), 1);
   for (const fixture of [alpha, beta]) {
     const workspace = workspaceSelector(fixture.workspaceId);
     assert.equal(await page.locator(`${workspace} > .workspace-header`).count(), 1);
@@ -170,9 +171,9 @@ try {
   await page.locator(paneSelector(alpha.paneId)).waitFor({ state: "visible" });
   assert.equal(await page.locator(`.workspace:has(${paneSelector(alpha.paneId)}) .workspace-toggle`).count(), 0);
   await page.evaluate((key) => localStorage.removeItem(key), singleFoldKey);
-  await changeState(page, [{ selector: paneSelector(other.paneId), attribute: ["aria-current", "true"] }, { selector: '.tab-strip [role="tab"]', count: 1 }],
+  await changeState(page, [{ selector: paneSelector(other.paneId), attribute: ["aria-current", "true"] }, { selector: '.tab-strip [role="tab"][data-tab-id]', count: 1 }],
     () => page.locator(paneSelector(other.paneId)).click(), "selecting the split workspace shows its strip");
-  assert.equal(await page.locator('.tab-strip [role="tab"]').textContent(), "Tab 1", "a tab herdr named by its number reads as Tab 1");
+  assert.equal(await page.locator('.tab-strip [role="tab"][data-tab-id]').textContent(), "Tab 1", "a tab herdr named by its number reads as Tab 1");
   const surfaces = await page.evaluate(() => {
     const header = document.querySelector(".app-header")!;
     const column = document.querySelector(".pane-column")!;
