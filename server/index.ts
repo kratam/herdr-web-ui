@@ -2,6 +2,9 @@ import "./adopt-legacy-env.ts";
 import { GgHostLoads } from "./gg-host-load.ts";
 import { GgAttentionStore } from "./gg-attention.ts";
 import { GgWorkService } from "./gg-work.ts";
+import { GgDecisionService } from "./gg-decisions.ts";
+import type { GgDiscussionService } from "./gg-discussion.ts";
+import { discussionRuntime } from "./gg-discussion-runtime.ts";
 import { GgOverviewService, liveRepositoryRoots } from "./gg-overview.ts";
 import { createCore, type SocketData } from "./core/index.ts";
 import { ClientConnectionLog } from "./client-connection-log.ts";
@@ -147,6 +150,8 @@ export function createServer(
     /** Saját GG-kiegészítés; a teszt a titok nélküli olvasót adja be. */
     ggOverview?: GgOverviewService;
     ggWork?: GgWorkService;
+    ggDecisions?: GgDecisionService;
+    ggDiscussion?: GgDiscussionService;
     /** Tests supply an isolated proxy service, never a user's configured instance. */
     cliProxy?: CLIProxyService;
     /** Tests use a disposable credential home and stand-in CLI binaries. */
@@ -281,6 +286,8 @@ export function createServer(
   const { machines, collector, queueFirstMessage, push } = core;
   // read finishes are kept until this server knows their herdr run ended
   const seen = new SeenStore(stateDir, (pc, epoch) => machines?.finishEnded(pc, epoch) ?? false);
+  const ggDecisions = options.ggDecisions ?? new GgDecisionService();
+  const ggDiscussion = options.ggDiscussion ?? discussionRuntime(stateDir, usage, queueFirstMessage);
   // started after createCore's Node probe (server/pty/sidecar.ts), which can hold the thread up to 3 s: that wait
   // would count against the read's own 2.5 s limit, and a read cut short leaves the owner unknown for 5 minutes
   identityOf(false, null);
@@ -320,7 +327,7 @@ export function createServer(
 
   const requestLog = new RequestLog(stateDir);
   const services: RequestServices = {
-    options, hostname, token, bridgeToken, bootId, devices, preferences, herdrSidebar, identityOf, serveOnly, portalGuards, shellAgents, agentDetector, agentOffered, agentInstaller, openCodeState, cliProxyRoutes, usageLogin, usage, ggOverview, ggWork, ggLoads, voice, browserSnapshot, core, seen, piReader, orderSequence, clientConnectionLog, requestLog, portalStartup,
+    options, hostname, token, bridgeToken, bootId, devices, preferences, herdrSidebar, identityOf, serveOnly, portalGuards, shellAgents, agentDetector, agentOffered, agentInstaller, openCodeState, cliProxyRoutes, usageLogin, usage, ggOverview, ggWork, ggLoads, ggDecisions, ggDiscussion, voice, browserSnapshot, core, seen, piReader, orderSequence, clientConnectionLog, requestLog, portalStartup,
     get portalStartupResult() { return portalStartupResult; },
   };
 

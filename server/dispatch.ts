@@ -40,6 +40,9 @@ import { handleStatuslineRequest, handleUsageRequest } from "./usage.ts";
 import { handleGgOverviewRequest, type GgOverviewService } from "./gg-overview.ts";
 import type { GgHostLoads } from "./gg-host-load.ts";
 import type { GgWorkService } from "./gg-work.ts";
+import type { GgDecisionService } from "./gg-decisions.ts";
+import type { GgDiscussionService } from "./gg-discussion.ts";
+import { handleGgDecisionRequest } from "./gg-decision-routes.ts";
 import { handleVoiceRequest } from "./voice.ts";
 import { BRIDGE_PROTOCOL } from "../shared/machines.ts";
 import { bridgeIdentity } from "./bridge.ts";
@@ -85,6 +88,8 @@ export interface RequestServices {
   readonly ggOverview: GgOverviewService;
   readonly ggWork: GgWorkService;
   readonly ggLoads: GgHostLoads;
+  readonly ggDecisions: GgDecisionService;
+  readonly ggDiscussion: GgDiscussionService;
   readonly voice: VoiceService;
   readonly browserSnapshot: <S extends SessionSnapshot>(snapshot: S) => S;
   readonly core: ReturnType<typeof createCore>;
@@ -108,7 +113,7 @@ export interface ServerContext {
 }
 
 export async function handleRequest(request: Request, ctx: ServerContext): Promise<Response | undefined> {
-  const { options, hostname, token, bridgeToken, bootId, devices, preferences, herdrSidebar, identityOf, serveOnly, portalGuards, shellAgents, agentDetector, agentOffered, agentInstaller, openCodeState, cliProxyRoutes, usageLogin, usage, ggOverview, ggWork, ggLoads, voice, browserSnapshot, core, seen, piReader, orderSequence, clientConnectionLog, requestLog, portalStartupResult, portalStartup } = ctx.services;
+  const { options, hostname, token, bridgeToken, bootId, devices, preferences, herdrSidebar, identityOf, serveOnly, portalGuards, shellAgents, agentDetector, agentOffered, agentInstaller, openCodeState, cliProxyRoutes, usageLogin, usage, ggOverview, ggWork, ggLoads, ggDecisions, ggDiscussion, voice, browserSnapshot, core, seen, piReader, orderSequence, clientConnectionLog, requestLog, portalStartupResult, portalStartup } = ctx.services;
   const { sidecar, serialize, push, logPushError, omo, claudeAgents, opencodeAgents, plans, clientSnapshot, machines, broadcastAll, collector, queueFirstMessage } = core;
   return requestLog.handle(request, async (headers) => {
   const startup = portalStartupResult ?? await portalStartup;
@@ -337,6 +342,10 @@ export async function handleRequest(request: Request, ctx: ServerContext): Promi
   if (pathname === "/api/seen") { setRequestRoute(pathname); return handleSeenRequest(request, seen); }
 
   if (pathname === "/api/gg/overview") { setRequestRoute(pathname); ctx.timeout(request, 60); return handleGgOverviewRequest(request, ggOverview, !readOnly && !bridgeAuthorized, feed => ggWork.decorate(feed)); }
+  if (pathname.startsWith("/api/gg/decisions/")) {
+    setRequestRoute("/api/gg/decisions/:id"); ctx.timeout(request, 120);
+    return handleGgDecisionRequest(request, !readOnly && !bridgeAuthorized, ggDecisions, ggDiscussion, ggOverview);
+  }
   if (pathname === "/api/gg/work") {
     setRequestRoute(pathname);
     if (readOnly || bridgeAuthorized) return jsonResponse({ error: { code: "read_only", message: "Interaktív helyi hozzáférés szükséges." } }, 403);

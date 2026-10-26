@@ -692,6 +692,18 @@ try {
   await checkCommandArrows(browser, origin, paneA);
   // a pane shortcut switches panes and types nothing: xterm used to send ESC[1;6B / ESC[1;6A too
   const selectedTitle = () => page.locator(".pane-item.is-selected .pane-select").getAttribute("title");
+  const selectPaneView = async (paneId: string) => {
+    await page.locator(`.pane-select[title^="${paneId} —"]`).click();
+    // A workspace-sor az utolsó nézetét állítja vissza; áttekintőből a natív tab visz a pane-re.
+    if (await page.locator(".gg-overview").isVisible()) {
+      const pane = (await sessionSnapshot()).panes.find((entry) => entry.pane_id === paneId);
+      assert.ok(pane, "the test pane is still registered");
+      await page.locator(`.tab-strip-tab[data-tab-id="${pane.tab_id}"]`).click();
+    }
+    await page.locator(`.pane-frame.is-current[data-layout-pane="${paneId}"]`).waitFor();
+  };
+  // A helyi virtuális Áttekintés tab is szabályos szomszéd, megtartott háttér-pane-nel.
+  const leftPaneView = async () => await page.locator(".gg-overview").isVisible() || !(await selectedTitle())?.startsWith(`${paneA} —`);
   // A pane just picked shows the lens of the pane before it for a moment, and the message box
   // of that lens can take the focus back: the key waits until the terminal still has it two frames on.
   const focusTerminal = () => until(async () => {
@@ -699,35 +711,37 @@ try {
     return page.evaluate(() => new Promise<boolean>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() =>
       resolve(document.activeElement?.classList.contains("xterm-helper-textarea") ?? false)))));
   }, "the terminal holds the focus");
+  const returnToFirstPane = async () => {
+    await selectPaneView(paneA);
+    await until(async () => (await selectedTitle())?.startsWith(`${paneA} —`) === true, "back on the first pane");
+  };
   for (const key of ["ControlOrMeta+Shift+ArrowDown", "ControlOrMeta+Shift+ArrowUp"]) {
     await focusTerminal();
     const beforeSwitch = inputs.length;
     await page.keyboard.press(key);
-    await until(async () => !(await selectedTitle())?.startsWith(`${paneA} —`), `${key} leaves the pane`);
+    await until(leftPaneView, `${key} leaves the pane view for an adjacent tab`);
     await page.waitForTimeout(NO_SEND_WAIT_MS); // fixed wait: the shortcut may reach no pane
     assert.deepEqual(inputs.slice(beforeSwitch), [], `${key} must not reach a pane`);
-    await page.locator(`.pane-select[title^="${paneA} —"]`).click();
-    await until(async () => (await selectedTitle())?.startsWith(`${paneA} —`) === true, "back on the first pane");
+    await returnToFirstPane();
   }
   await page.getByTitle("Chat transcript (⌘⇧J)", { exact: true }).click();
   await composer.waitFor();
   // the empty message box has no text to select: the pane shortcut switches panes from it too
   await composer.focus();
   await page.keyboard.press("ControlOrMeta+Shift+ArrowDown");
-  await until(async () => !(await selectedTitle())?.startsWith(`${paneA} —`), "the empty message box leaves the pane");
-  await page.locator(`.pane-select[title^="${paneA} —"]`).click();
-  await until(async () => (await selectedTitle())?.startsWith(`${paneA} —`) === true, "back on the first pane");
+  await until(leftPaneView, "the empty message box leaves the pane view");
+  await returnToFirstPane();
   await composer.fill("draft");
   // the caret at the end of a draft: up selects the text first, and the pane stays
   await page.keyboard.press("ControlOrMeta+Shift+ArrowUp");
   await page.waitForTimeout(NO_SEND_WAIT_MS); // fixed wait: the shortcut may not switch pane while the draft has text that way
   assert.ok((await selectedTitle())?.startsWith(`${paneA} —`), "a draft keeps Mod+Shift+arrows while they select text");
+  assert.equal(await page.locator(".gg-overview").isVisible(), false, "a draft keeps the pane view in front");
   assert.deepEqual(await composer.evaluate((node: HTMLTextAreaElement) => [node.selectionStart, node.selectionEnd]), [0, 5], "up selected the draft");
   // nothing is left to select that way: the next press switches panes, so a draft never stops the shortcut
   await page.keyboard.press("ControlOrMeta+Shift+ArrowUp");
-  await until(async () => !(await selectedTitle())?.startsWith(`${paneA} —`), "a draft selected to its start lets the pane shortcut go");
-  await page.locator(`.pane-select[title^="${paneA} —"]`).click();
-  await until(async () => (await selectedTitle())?.startsWith(`${paneA} —`) === true, "back on the first pane");
+  await until(leftPaneView, "a draft selected to its start lets the pane shortcut go");
+  await returnToFirstPane();
   await composer.fill("");
   console.log("PASS pane shortcut from the empty message box; a draft keeps text selection until none is left that way");
   console.log("PASS terminal clipboard paste sends text once and preserves Ctrl+C");
@@ -1180,7 +1194,7 @@ try {
   assert.equal(await page.getByRole("button", { name: "Report a problem", exact: true }).count(), 0, "no report action");
 
   const selectPane = async (paneId: string) => {
-    await page.locator(`.pane-select[title^="${paneId} —"]`).click();
+    await selectPaneView(paneId);
     await page.locator(`.pane-frame[data-layout-pane="${paneId}"]`).getByRole("log").waitFor();
   };
   await composer.fill("draft for A");
@@ -1779,7 +1793,8 @@ try {
     "tab labels stay in the terminal tab strip");
   const strip = page.locator(".tab-strip");
   await strip.waitFor();
-  assert.deepEqual(await strip.getByRole("tab").allTextContents(), ["Tab 1", "second"]);
+  assert.deepEqual(await strip.locator('[role="tab"][data-tab-id]').allTextContents(), ["Tab 1", "second"]);
+  assert.equal(await strip.getByRole("tab").first().textContent(), "Áttekintés");
   assert.equal(await strip.getByRole("tab", { selected: true }).textContent(), "second");
   assert.equal(await strip.locator(".tab-strip-close, .tab-strip-panes").count(), 0, "tab close buttons and chevrons are removed");
   assert.equal(await strip.locator(".tab-strip-menu:visible").count(), 0, "desktop tabs show no menu button at rest");
@@ -1875,13 +1890,13 @@ try {
   assert.equal(terminalTab.agent_started, false, "no agent is started");
   await until(async () => (await page.locator(`.pane-select[title^="${terminalTab.pane_id} —"]`).getAttribute("aria-current")) === "true", "the shell tab's pane is selected");
   assert.equal(await page.getByRole("dialog", { name: /^New tab/ }).count(), 0, "the + opens no dialog");
-  assert.equal(await strip.getByRole("tab").count(), 3, "the strip lists the shell tab");
+  assert.equal(await strip.locator('[role="tab"][data-tab-id]').count(), 3, "the strip lists the shell tab");
   const terminalTabId = (await sessionSnapshot()).panes.find((pane) => pane.pane_id === terminalTab.pane_id)?.tab_id;
   assert.ok(terminalTabId, "herdr has the shell tab's pane");
   await strip.getByRole("tab", { name: "Tab 1", exact: true }).click();
   await until(async () => (await page.locator(`.pane-select[title^="${created.pane_id} —"]`).getAttribute("aria-current")) === "true", "the first tab opens its pane again");
   await herdrRpc("tab.close", { tab_id: terminalTabId });
-  await until(async () => (await strip.getByRole("tab").count()) === 2, "the shell tab is gone from the strip");
+  await until(async () => (await strip.locator('[role="tab"][data-tab-id]').count()) === 2, "the shell tab is gone from the strip");
   console.log("PASS the strip's + opens a shell tab at once, with no dialog");
 
   // A tab is renamed and closed from the strip, as herdr's prefix+shift+t and prefix+shift+x.
@@ -1892,7 +1907,7 @@ try {
   await tabName.fill("  first  ");
   await page.keyboard.press("Enter");
   await until(async () => (await tabsInHerdr()).join() === "first,second", "herdr has the tab's new name, trimmed");
-  assert.deepEqual(await strip.getByRole("tab").allTextContents(), ["first", "second"]);
+  assert.deepEqual(await strip.locator('[role="tab"][data-tab-id]').allTextContents(), ["first", "second"]);
   assert.equal(await workspaceGroup(created.workspace_id).locator(".workspace-name").textContent(), "ovis-test-browser-created",
     "renaming a tab leaves the workspace name unchanged");
   await until(async () => await strip.getByRole("tab", { name: "first", exact: true }).evaluate((tab) => tab === document.activeElement), "the renamed tab has the focus back");
@@ -1912,7 +1927,7 @@ try {
   assert.equal(await tabName.count(), 1, "a blank name keeps the field open");
   await page.keyboard.press("Escape");
   await tabName.waitFor({ state: "detached" });
-  assert.deepEqual(await strip.getByRole("tab").allTextContents(), ["first", "second"]);
+  assert.deepEqual(await strip.locator('[role="tab"][data-tab-id]').allTextContents(), ["first", "second"]);
   assert.equal((await tabsInHerdr()).join(), "first,second");
   // a right-click opens the tab's menu
   await strip.getByRole("tab", { name: "second", exact: true }).click({ button: "right" });
@@ -1984,7 +1999,7 @@ try {
   await page.keyboard.press("ArrowRight");
   await until(async () => await strip.getByRole("tab", { name: "build", exact: true }).evaluate((tab) => tab === document.activeElement), "the arrow moved the focus to the other tab");
   await page.keyboard.press("Delete");
-  await until(async () => await strip.getByRole("tab").count() === 1, "the native strip keeps its last tab");
+  await until(async () => await strip.locator('[role="tab"][data-tab-id]').count() === 1, "the native strip keeps its last tab");
   assert.equal((await tabsInHerdr()).join(), "first", "herdr closed the tab and kept the other");
   assert.equal(await page.locator(`.pane-select[title^="${created.pane_id} —"]`).getAttribute("aria-current"), "true", "the open pane stays");
   await until(async () => await strip.getByRole("tab", { name: "first", exact: true }).evaluate((tab) => tab === document.activeElement), "the surviving tab receives focus");

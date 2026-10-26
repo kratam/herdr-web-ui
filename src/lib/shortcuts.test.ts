@@ -368,9 +368,9 @@ describe("punctuation keys by position", () => {
 });
 
 describe("local 0.4.8 object bindings", () => {
-  it("carry over to the stored chord strings", () => {
+  it("carry over only the chord strings bindable on each platform", () => {
     const old = (key: string, mods: Partial<Record<"ctrlKey" | "metaKey" | "altKey" | "shiftKey", boolean>>) => ({ key, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...mods });
-    expect(sanitizeShortcutOverrides({
+    const bindings = {
       "previous-pane": old("1", { ctrlKey: true, altKey: true }),
       "next-pane": old("2", { ctrlKey: true, altKey: true }),
       "scroll-up": old("PageUp", { metaKey: true }),
@@ -379,7 +379,8 @@ describe("local 0.4.8 object bindings", () => {
       settings: old("x", {}),
       "toggle-sidebar": old("Home", { metaKey: true, shiftKey: true }),
       "new-tab": old("é", { metaKey: true, altKey: true }),
-    })).toEqual({ "new-tab": "alt+meta+;", "previous-pane": "ctrl+alt+1", "next-pane": "ctrl+alt+2", "scroll-up": "meta+PageUp", find: isMacPlatform() ? "ctrl+shift+g" : "g",
-      "toggle-sidebar": isMacPlatform() ? "Home" : "shift+meta+Home" });
+    };
+    expect(sanitizeShortcutOverrides(bindings, true)).toEqual({ "new-tab": "alt+meta+;", "previous-pane": "ctrl+alt+1", "next-pane": "ctrl+alt+2", "scroll-up": "meta+PageUp", find: "ctrl+shift+g", "toggle-sidebar": "Home" });
+    expect(sanitizeShortcutOverrides(bindings, false)).toEqual({ "previous-pane": "ctrl+alt+1", "next-pane": "ctrl+alt+2", find: "g" });
   });
 });

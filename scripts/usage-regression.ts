@@ -49,6 +49,8 @@ async function staged(context: BrowserContext): Promise<{ asked: string[]; after
   const afterReload: string[] = [];
   // the status-line switch reads Claude's settings on the server's PC: answered here, never by the test server
   await context.route("**/api/usage/statusline", (route) => route.fulfill({ json: { installed: false, supported: true } }));
+  // A sor szélessége ne a tesztet futtató gép pillanatnyi terhelésétől függjön.
+  await context.route("**/api/gg/host-loads", route => route.fulfill({ json: { hosts: [{ id: "local", data: { cpus: 8, load: [2, 2, 2], observed_at: at(0) }, error: null }] } }));
   await context.route("**/api/usage*", (route) => {
     asked.push(new URL(route.request().url()).search);
     if (route.request().headers()[RELOADED]) afterReload.push(route.request().url());
@@ -76,9 +78,12 @@ export async function checkUsageMeters(browser: Browser, origin: string): Promis
     await settingsButton.click();
     await openSettingsPage(page, "Agents");
     assert.equal(await toggle.getAttribute("aria-checked"), "false");
+    // A be- és kikapcsolás két külön mentés legyen, ne a debounce vonja össze őket.
+    const enabledSaved = page.waitForResponse(response => new URL(response.url()).pathname === "/api/preferences" && response.request().method() === "PUT" && response.request().postDataJSON()?.settings?.showUsage === true);
     await toggle.click();
     await page.keyboard.press("Escape");
     await strip.waitFor();
+    assert.equal((await (await enabledSaved).json()).settings.showUsage, true);
 
     // what is left of each plan's five-hour session by default, in the server's order; a plan
     // without a session shows its limit closest to running out, and the tooltip names another
@@ -86,14 +91,16 @@ export async function checkUsageMeters(browser: Browser, origin: string): Promis
     const chipCount = await page.locator(".usage-chip").count();
     const more = await page.locator(".usage-more").count() === 0 ? 0 : Number((await page.locator(".usage-more").textContent())!.slice(1));
     assert.equal(chipCount + more, 7, "every account is a chip or counted in +N");
-    assert.ok(chipCount >= 4, `the row beside the Settings gear holds at least four chips (${chipCount})`);
+    // A helyi GG-gépterhelés is ezen a soron van; a többi fiók a +N alatt elérhető.
+    assert.ok(chipCount >= 3, `the row beside Settings and host load holds at least three chips (${chipCount})`);
     assert.equal(await strip.getAttribute("aria-label"),
       "Subscription usage: Claude · me@example.com 58% left, Codex · me@work.example 88% left (Weekly 9% left), Codex · me@example.com 70% left, Cursor 80% left, GitHub Copilot · me 100% left, Grok 100% left, Antigravity —");
-    assert.deepEqual((await page.locator(".usage-chip-value").allTextContents()).slice(0, 4), ["58%", "88%", "70%", "80%"]);
+    assert.deepEqual(await page.locator(".usage-chip-value").allTextContents(), ["58%", "88%", "70%", "80%", "100%", "100%", "—"].slice(0, chipCount));
     assert.equal(await page.locator(".usage-chip.is-high").count(), 0, "no session is near its end");
     assert.equal(await strip.evaluate((el) => el.scrollWidth <= el.clientWidth), true, "the chips fit beside Settings");
-    const [settings, meters] = await Promise.all([page.locator(".sidebar-footer-row .sidebar-footer-action").boundingBox(), strip.boundingBox()]);
+    const [settings, meters, loads] = await Promise.all([page.locator(".sidebar-footer-row .sidebar-footer-action").boundingBox(), strip.boundingBox(), page.locator(".gg-host-loads").boundingBox()]);
     assert.ok(settings && meters && settings.x + settings.width <= meters.x, "Settings and the meters do not overlap");
+    assert.ok(loads && meters && loads.x + loads.width <= meters.x, "host load and the plan meters do not overlap");
 
     await strip.click();
     const popover = page.getByRole("dialog", { name: "Subscription usage", exact: true });
@@ -195,15 +202,22 @@ export async function checkUsageMeters(browser: Browser, origin: string): Promis
   const phone = await usageContext(browser, { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, locale: "en-US" });
   try {
     await staged(phone);
-    await phone.addInitScript(() => localStorage.setItem("ovis:settings", JSON.stringify({ showUsage: true })));
     const page = await phone.newPage();
     await page.goto(origin);
     await page.getByRole("button", { name: "Open workspace list", exact: true }).click();
+    // A másik böngészőn kikapcsolt közös beállítást a telefonon is valódi felületi művelet oldja fel.
+    await page.locator(".sidebar-footer-row .sidebar-footer-action").click();
+    await openSettingsPage(page, "Agents");
+    await page.getByRole("switch", { name: "Show plan limits", exact: true }).setChecked(true);
+    await page.getByRole("button", { name: "Close settings", exact: true }).click();
+    await page.getByRole("button", { name: "Open workspace list", exact: true }).click();
+    // A geometriai ellenőrzés a fiók becsúszása után értelmezhető.
+    await page.waitForFunction(() => document.querySelector(".sidebar.is-open")?.getAnimations().length === 0);
     await page.locator(".usage-strip").click();
     const popover = page.getByRole("dialog", { name: "Subscription usage", exact: true });
     await popover.waitFor();
     const box = await popover.boundingBox();
-    assert.ok(box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 390, "the popover stays inside the phone's screen");
+    assert.ok(box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 390, `the popover stays inside the phone's screen: ${JSON.stringify(box)}`);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     if (process.env.UI_EVIDENCE_DIR) await page.locator(".sidebar-shell").screenshot({ path: join(process.env.UI_EVIDENCE_DIR, "usage-popover-phone.png") });
 
