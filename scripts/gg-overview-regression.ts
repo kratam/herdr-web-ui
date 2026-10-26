@@ -63,6 +63,7 @@ try {
   page.on("pageerror", error => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.port}`);
   await page.getByRole("button", { name: "Globális áttekintés", exact: true }).click();
+  await page.locator(".gg-runtime-summary > summary").click();
   await page.getByRole("link", { name: "gg-closed-fixture", exact: true }).waitFor();
   if (process.env.CHECK_BROWSER_EVIDENCE_DIR) await page.screenshot({ path: join(process.env.CHECK_BROWSER_EVIDENCE_DIR, "gg-global-mvp.png"), fullPage: true });
   await page.getByRole("link", { name: prefix, exact: true }).click();
@@ -143,6 +144,7 @@ try {
   await page.getByRole("tab").first().click();
   await page.getByRole("heading", { name: prefix, exact: true }).waitFor();
   await page.getByRole("button", { name: "Vissza a globális áttekintéshez" }).click();
+  await page.locator(".gg-runtime-summary > summary").click();
   await page.getByRole("link", { name: "gg-closed-fixture", exact: true }).click();
   await page.getByRole("heading", { name: "gg-closed-fixture", exact: true }).waitFor();
   assert.equal(await page.getByRole("tab").first().getAttribute("aria-selected"), "true");

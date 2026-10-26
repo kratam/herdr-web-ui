@@ -23,6 +23,16 @@
 .gg-overview-details { padding: var(--space-3); white-space: pre-wrap; overflow-wrap: anywhere; }
 .gg-overview-warning { color: var(--text); background: var(--bg-elevated); padding: var(--space-3); border-radius: var(--radius-sm); }
 .gg-overview-footnote { margin-top: var(--space-6); max-width: 90ch; }
+.gg-decision { padding: var(--space-4) 0; border-bottom: 1px solid var(--border); max-width: 85ch; min-width: 0; }
+.gg-decision > details { border: 0; }
+.gg-decision > details > summary { font-weight: var(--fw-medium); }
+.gg-decision-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0; }
+.gg-decision .btn { min-height: 44px; white-space: normal; }
+.gg-decision-form { display: grid; gap: var(--space-3); padding: var(--space-4); margin-top: var(--space-3); background: var(--bg-elevated); border-radius: var(--radius-md); }
+.gg-decision-form p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.gg-decision-form textarea { width: 100%; box-sizing: border-box; min-height: 6rem; padding: var(--space-3); color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); font: inherit; resize: vertical; }
+.gg-decision-form > button { justify-self: start; }
+.gg-overview .gg-runtime-summary { margin-bottom: var(--space-6); }
 @media (max-width: 640px) { .gg-overview { padding: var(--space-4); } .gg-overview-heading { flex-wrap: wrap; } .gg-overview th, .gg-overview td { padding: var(--space-3) var(--space-2); } }
 
 /* Azonos beljebb kezdés és ikonhely a gép- és workspace-sorokkal. */

@@ -2,6 +2,10 @@ import "./adopt-legacy-env.ts";
 import { GgHostLoads } from "./gg-host-load.ts";
 import { GgAttentionStore } from "./gg-attention.ts";
 import { GgWorkService } from "./gg-work.ts";
+import { GgDecisionService } from "./gg-decisions.ts";
+import type { GgDiscussionService } from "./gg-discussion.ts";
+import { discussionRuntime } from "./gg-discussion-runtime.ts";
+import { handleGgDecisionRequest } from "./gg-decision-routes.ts";
 import { GgOverviewService, handleGgOverviewRequest, liveRepositoryRoots } from "./gg-overview.ts";
 import { handleWorkspaceRequest } from "./workspace-routes.ts";
 import { connectionData, createCore, type SocketData } from "./core/index.ts";
@@ -158,6 +162,8 @@ export function createServer(
     /** Saját GG-kiegészítés; a teszt a titok nélküli olvasót adja be. */
     ggOverview?: GgOverviewService;
     ggWork?: GgWorkService;
+    ggDecisions?: GgDecisionService;
+    ggDiscussion?: GgDiscussionService;
     /** Tests supply an isolated proxy service, never a user's configured instance. */
     cliProxy?: CLIProxyService;
     /** Tests use a disposable credential home and stand-in CLI binaries. */
@@ -254,6 +260,8 @@ export function createServer(
   draftTimer.unref();
   const core = createCore({ options: { ...options, stateDir, openCodeState, orderSequence }, devices, preferences, usage, usageLogin, TYPED_SETTLE_MS, KEY_SETTLE_MS, SUBMIT_DEADLINE_MS, SUBMIT_DELAY_MS, DRAFT_CLEAR_WAIT_MS, DRAFT_CLEAR_POLL_MS });
   const { sidecar, serialize, push, logPushError, omo, claudeAgents, plans, clientSnapshot, machines, broadcastAll, collector, queueFirstMessage } = core;
+  const ggDecisions = options.ggDecisions ?? new GgDecisionService();
+  const ggDiscussion = options.ggDiscussion ?? discussionRuntime(stateDir, usage, queueFirstMessage);
   // started after createCore's Node probe (server/pty/sidecar.ts), which can hold the thread up to 3 s: that wait
   // would count against the read's own 2.5 s limit, and a read cut short leaves the owner unknown for 5 minutes
   identityOf(false, null);
@@ -459,6 +467,10 @@ export function createServer(
       if (pathname === "/api/seen") { setRequestRoute(pathname); return handleSeenRequest(request, seen); }
 
       if (pathname === "/api/gg/overview") { setRequestRoute(pathname); bunServer.timeout(request, 60); return handleGgOverviewRequest(request, ggOverview, !readOnly && !bridgeAuthorized, feed => ggWork.decorate(feed)); }
+      if (pathname.startsWith("/api/gg/decisions/")) {
+        setRequestRoute("/api/gg/decisions/:id"); bunServer.timeout(request, 120);
+        return handleGgDecisionRequest(request, !readOnly && !bridgeAuthorized, ggDecisions, ggDiscussion, ggOverview);
+      }
       if (pathname === "/api/gg/work") {
         setRequestRoute(pathname);
         if (readOnly || bridgeAuthorized) return jsonResponse({ error: { code: "read_only", message: "Interaktív helyi hozzáférés szükséges." } }, 403);

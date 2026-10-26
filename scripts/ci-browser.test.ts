@@ -110,6 +110,7 @@ describe("browser lane", () => {
 // Browser scripts that CI does not run: they are run by hand. A new browser script belongs in
 // scripts/ci-browser.sh, or here when CI cannot run it.
 const MANUAL_BROWSER_SCRIPTS = [
+  "scripts/gg-decisions-regression.ts", // Saját GG-kiegészítés; a helyi updater futtatja (docs/gg-overview.md).
   "scripts/android-ime-regression.ts", // an Android emulator over ADB (docs/terminal-input.md)
   "scripts/chat-browser-qa.ts", // docs/development.md
   "scripts/font-swap-demo-regression.ts", // docs/development.md

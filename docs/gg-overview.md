@@ -2,8 +2,8 @@
 
 A `local/main-gg` kiegészítés két helyi nézetet ad:
 
-- A **Globális áttekintés** a nyitott workspace-eket és az aktív core-csomagok
-  repositoryihoz tartozó, workspace nélkül is fennmaradó feladatokat összesíti.
+- A **Globális áttekintés** elején az autonóm sor döntései vannak. A futó sessionök
+  és workspace-ek lenyitható összesítést kapnak; a tartós munkák külön listában látszanak.
 - A **workspace első Áttekintés tabja** döntéseket, munkákat és hibákat mutat.
   Virtuális Ovis-tab: nem Herdr-terminál, nem húzható át és nem zárható be.
   A normál tabok helye és a meglévő limitkijelzés megmarad.
@@ -13,7 +13,41 @@ meglévő workspace-létrehozása nyit egy shell-tabot a már konfigurált fő c
 coding agent nem indul. Hiányzó könyvtárkötés vagy bizonytalan létrehozási eredmény
 látható hiba, nem kitalált könyvtár vagy automatikus újrapróbálkozás.
 
-## Adatforrás és lefedettség
+## Válaszadás és átbeszélés
+
+A **Válaszolok** a kiválasztott story pontos döntését frissen olvassa a kanonikus
+`autoagent_decisions` MCP-toollal. A javaslat, kockázat, PR-head és a terv lejárata
+ellenőrizhető. A választ a **Válasz rögzítése** menti a meglévő `session_reply`
+művelettel; a teljes nyers szöveg megmarad. A típusos feldolgozást, tulajdonost,
+epochot, forrásrevíziót, PR-headet és tervkötést a kanonikus rendszer ellenőrzi.
+Nincs közvetlen DB-írás vagy válaszként létrehozott Linear-komment.
+
+Csak a válaszhoz kötött nyugta után jelzünk sikert. Félreérthető válasznál a
+kérdés nyitva marad; hibánál a beírt szöveg megmarad. Nincs automatikus küldési
+újrapróbálás. Változatlan szöveg és döntéskötés kézi újraküldése ugyanazt az
+idempotens kérést ellenőrzi. Mentés után a közös áttekintő cache érvénytelenedik.
+
+A **Beszéljük át** ugyanazt a **Döntések átbeszélése** Herdr-tabot használja, a
+`gg-agent-skills` konfigurált fő checkoutjában. Első kattintásra friss, ismert heti
+kerettel rendelkező normál agent indul; a meglévő beszélgetés nem vált modellt.
+A kontextust az Ovis meglévő, a böngésző és a futó session azonosságához kötött
+üzenetsora adja át. A tényleges emberi választ az agent-decisions skill kezeli.
+Interaktív koordinátorok saját kérdései továbbra is a saját beszélgetésükben maradnak.
+
+A privát `gg-discussion.json` csak a saját tab/terminál/PID/session kötését és a
+kontextusátadás nyugtáját tartja, nem másolatot a döntésekről. Egyidejű kattintások
+egyetlen indítást végeznek. Lezárt pane után új tab nyílhat; lecserélt sessionnek
+nem küldünk üzenetet. Bizonytalan indításnál/átadásnál a meglévő tab ellenőrzése kell.
+Az Ovis memóriabeli üzenetsora újraindításkor elveszhet: a régi elfogadott átadást
+ilyenkor nem állítjuk bizonyított kézbesítésnek, és nem ismételjük automatikusan.
+
+Új útvonalak: `GET /api/gg/decisions/:id?story=IT-N`, `POST .../:id/reply`,
+`POST .../:id/discuss`. A meglévő interaktív helyi hozzáférés és same-origin kapu
+mögött vannak; watch/bridge hozzáférésből egyik sem használható. A rövid életű
+MCP-kapcsolat az autentikált `gg-mcp-proxy` identitását használja és mindig lezárul.
+Nincs új periodikus lekérdezés vagy daemon.
+
+## Áttekintő olvasó
 
 `GET /api/gg/overview`: a meglévő Ovis-hitelesítés mögött, csak interaktív helyi
 hozzáférésből. Watch és bridge nem kap GG-adatot. A GG-kiegészítés magyar nyelvű,
@@ -54,6 +88,8 @@ HERDR_TEST_MODE=unit bun test ./server/gg-overview.test.ts ./src/lib/ggOverview.
 bun run typecheck
 bun run build
 HERDR_TEST_SESSION=ovis-gg-overview-mvp bun scripts/gg-overview-regression.ts
+HERDR_TEST_MODE=unit bun test ./server/gg-decisions.test.ts ./server/gg-discussion.test.ts ./server/gg-decision-routes.test.ts
+bun run check run bun scripts/gg-decisions-regression.ts
 ```
 
 A böngészős próba saját Herdr-sessionön és saját state-könyvtárral, fixture-adatokon
