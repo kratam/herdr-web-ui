@@ -691,6 +691,8 @@ try {
   await checkCommandArrows(browser, origin, paneA);
   // a pane shortcut switches panes and types nothing: xterm used to send ESC[1;6B / ESC[1;6A too
   const selectedTitle = () => page.locator(".pane-item.is-selected .pane-select").getAttribute("title");
+  // A helyi virtuális Áttekintés tab is szabályos szomszéd, megtartott háttér-pane-nel.
+  const leftPaneView = async () => await page.locator(".gg-overview").isVisible() || !(await selectedTitle())?.startsWith(`${paneA} —`);
   // A pane just picked shows the lens of the pane before it for a moment, and the message box
   // of that lens can take the focus back: the key waits until the terminal still has it two frames on.
   const focusTerminal = () => until(async () => {
@@ -702,7 +704,7 @@ try {
     await focusTerminal();
     const beforeSwitch = inputs.length;
     await page.keyboard.press(key);
-    await until(async () => !(await selectedTitle())?.startsWith(`${paneA} —`), `${key} leaves the pane`);
+    await until(leftPaneView, `${key} leaves the pane view for an adjacent tab`);
     await page.waitForTimeout(NO_SEND_WAIT_MS); // fixed wait: the shortcut may reach no pane
     assert.deepEqual(inputs.slice(beforeSwitch), [], `${key} must not reach a pane`);
     await page.locator(`.pane-select[title^="${paneA} —"]`).click();
@@ -713,13 +715,14 @@ try {
   // the empty message box has no text to select: the pane shortcut switches panes from it too
   await composer.focus();
   await page.keyboard.press("ControlOrMeta+Shift+ArrowDown");
-  await until(async () => !(await selectedTitle())?.startsWith(`${paneA} —`), "the empty message box leaves the pane");
+  await until(leftPaneView, "the empty message box leaves the pane view");
   await page.locator(`.pane-select[title^="${paneA} —"]`).click();
   await until(async () => (await selectedTitle())?.startsWith(`${paneA} —`) === true, "back on the first pane");
   await composer.fill("draft");
   await page.keyboard.press("ControlOrMeta+Shift+ArrowDown");
   await page.waitForTimeout(NO_SEND_WAIT_MS); // fixed wait: the shortcut may not switch pane while a draft is typed
   assert.ok((await selectedTitle())?.startsWith(`${paneA} —`), "a draft keeps Mod+Shift+arrows for selecting text");
+  assert.equal(await page.locator(".gg-overview").isVisible(), false, "a draft keeps the pane view in front");
   await composer.fill("");
   console.log("PASS pane shortcut from the empty message box; a draft keeps text selection");
   console.log("PASS terminal clipboard paste sends text once and preserves Ctrl+C");

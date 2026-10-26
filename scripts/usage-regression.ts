@@ -37,6 +37,8 @@ const RELOADED = "x-usage-qa-reloaded";
 async function staged(context: BrowserContext): Promise<{ asked: string[]; afterReload: string[] }> {
   const asked: string[] = [];
   const afterReload: string[] = [];
+  // A sor szélessége ne a tesztet futtató gép pillanatnyi terhelésétől függjön.
+  await context.route("**/api/gg/host-loads", route => route.fulfill({ json: { hosts: [{ id: "local", data: { cpus: 8, load: [2, 2, 2], observed_at: at(0) }, error: null }] } }));
   await context.route("**/api/usage*", (route) => {
     asked.push(new URL(route.request().url()).search);
     if (route.request().headers()[RELOADED]) afterReload.push(route.request().url());
@@ -74,14 +76,16 @@ export async function checkUsageMeters(browser: Browser, origin: string): Promis
     const chipCount = await page.locator(".usage-chip").count();
     const more = await page.locator(".usage-more").count() === 0 ? 0 : Number((await page.locator(".usage-more").textContent())!.slice(1));
     assert.equal(chipCount + more, 7, "every account is a chip or counted in +N");
-    assert.ok(chipCount >= 4, `the row beside the Settings gear holds at least four chips (${chipCount})`);
+    // A helyi GG-gépterhelés is ezen a soron van; a többi fiók a +N alatt elérhető.
+    assert.ok(chipCount >= 3, `the row beside Settings and host load holds at least three chips (${chipCount})`);
     assert.equal(await strip.getAttribute("aria-label"),
       "Subscription usage: Claude · me@example.com 58% left, Codex · me@work.example 88% left (Weekly 9% left), Codex · me@example.com 70% left, Cursor 80% left, GitHub Copilot · me 100% left, Grok 100% left, Antigravity —");
-    assert.deepEqual((await page.locator(".usage-chip-value").allTextContents()).slice(0, 4), ["58%", "88%", "70%", "80%"]);
+    assert.deepEqual(await page.locator(".usage-chip-value").allTextContents(), ["58%", "88%", "70%", "80%", "100%", "100%", "—"].slice(0, chipCount));
     assert.equal(await page.locator(".usage-chip.is-high").count(), 0, "no session is near its end");
     assert.equal(await strip.evaluate((el) => el.scrollWidth <= el.clientWidth), true, "the chips fit beside Settings");
-    const [settings, meters] = await Promise.all([page.locator(".sidebar-footer-row .sidebar-footer-action").boundingBox(), strip.boundingBox()]);
+    const [settings, meters, loads] = await Promise.all([page.locator(".sidebar-footer-row .sidebar-footer-action").boundingBox(), strip.boundingBox(), page.locator(".gg-host-loads").boundingBox()]);
     assert.ok(settings && meters && settings.x + settings.width <= meters.x, "Settings and the meters do not overlap");
+    assert.ok(loads && meters && loads.x + loads.width <= meters.x, "host load and the plan meters do not overlap");
 
     await strip.click();
     const popover = page.getByRole("dialog", { name: "Subscription usage", exact: true });
