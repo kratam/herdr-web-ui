@@ -265,7 +265,13 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
   };
 
   const focusTab = (tabId: string): void => {
-    window.requestAnimationFrame(() => strip.current?.querySelector<HTMLElement>(`[role="tab"][data-tab-id="${CSS.escape(tabId)}"]`)?.focus());
+    const previousFocus = document.activeElement;
+    window.requestAnimationFrame(() => {
+      // A késői tabzárás nem veheti vissza a közben máshová helyezett fókuszt.
+      if (document.activeElement !== previousFocus) return;
+      if (latest.current.machineId !== machineId || latest.current.workspaceId !== workspace.workspace_id) return;
+      strip.current?.querySelector<HTMLElement>(`[role="tab"][data-tab-id="${CSS.escape(tabId)}"]`)?.focus();
+    });
   };
 
   // an empty name is not sent: herdr would keep it, and its own tab row would show nothing
@@ -305,7 +311,8 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
     if (!beside) { focusWorkspaceListToggle(); return; }
     const pane = paneFor(beside);
     if (latest.current.tabId === tab.tab_id && pane) onSelectPane(pane.pane_id);
-    if (strip.current?.contains(document.activeElement) || document.activeElement === document.body) focusTab(beside.tab_id);
+    // A snapshot már visszaadhatta a fókuszt; az ACK csak a függő átadást vagy az üres fókuszt rendezi.
+    if (document.activeElement === document.body || (closed.current === focusAfterClose && strip.current?.contains(document.activeElement))) focusTab(beside.tab_id);
   };
   const requestClose = (tab: HerdrTab): void => {
     setError(null);
