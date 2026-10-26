@@ -408,6 +408,9 @@ export async function checkTerminalInput(browser: Browser, origin: string, pane:
     const selectionBefore = await page.evaluate(() => localStorage.getItem("ovis:selection"));
     await page.keyboard.press("ControlOrMeta+Shift+p");
     await until(async () => (await page.evaluate(() => localStorage.getItem("ovis:selection"))) !== selectionBefore);
+    // A GG-áttekintő is navigációs lépés; a próba itt a következő valódi pane-re váltást kéri.
+    if (await page.locator(".gg-overview").isVisible()) await page.keyboard.press("ControlOrMeta+Shift+p");
+    await page.locator(".pane-frame.is-current").waitFor();
     await page.goto(`${origin}/?pane=${encodeURIComponent(pane)}`);
     await line.waitFor();
     await page.keyboard.press("ControlOrMeta+Shift+Comma");

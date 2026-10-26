@@ -139,10 +139,13 @@ export async function checkUsageMeters(browser: Browser, origin: string): Promis
     // turned off in Settings: gone, and no longer asked for
     await settingsButton.click();
     await openSettingsPage(page, "Subscription usage");
+    // Az újratöltés előtt a késleltetett, közös preferenciamentés visszaigazolását várjuk.
+    const disabledSaved = page.waitForResponse(response => new URL(response.url()).pathname === "/api/preferences" && response.request().method() === "PUT" && response.request().postDataJSON()?.settings?.showUsage === false);
     await toggle.click();
     await strip.waitFor({ state: "detached" });
     assert.equal(await page.locator(".usage-accounts-intro .settings-note").count(), 1);
     assert.equal(await page.locator(".usage-provider").count(), 0, "disabled meters leave no provider placeholders");
+    assert.equal((await (await disabledSaved).json()).settings.showUsage, false);
     // a request Settings made before the switch can still be on its way here, so the count is of
     // the reloaded page's own requests, not of what arrives after the reload
     await context.setExtraHTTPHeaders({ [RELOADED]: "1" });
@@ -159,9 +162,14 @@ export async function checkUsageMeters(browser: Browser, origin: string): Promis
   const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, locale: "en-US" });
   try {
     await staged(phone);
-    await phone.addInitScript(() => localStorage.setItem("ovis:settings", JSON.stringify({ showUsage: true })));
     const page = await phone.newPage();
     await page.goto(origin);
+    await page.getByRole("button", { name: "Open workspace list", exact: true }).click();
+    // A másik böngészőn kikapcsolt közös beállítást a telefonon is valódi felületi művelet oldja fel.
+    await page.locator(".sidebar-footer-row .sidebar-footer-action").click();
+    await openSettingsPage(page, "Subscription usage");
+    await page.getByRole("switch", { name: "Show plan limits", exact: true }).setChecked(true);
+    await page.getByRole("button", { name: "Close settings", exact: true }).click();
     await page.getByRole("button", { name: "Open workspace list", exact: true }).click();
     await page.locator(".usage-strip").click();
     const popover = page.getByRole("dialog", { name: "Subscription usage", exact: true });

@@ -59,7 +59,7 @@
 - [x] Interakciós próba előbb: helyben válasz → nyugta → lista frissül; ambiguous/hiba → válasz megmarad; beszélgetés → ugyanaz a pane.
 - [x] Globálisan és workspace-ben elöl az autonóm döntések, alattuk a meglévő munkák/állapot. Rövid kérdés, javaslat, kockázat; a valódi terv és PR-kötés elolvasható.
 - [x] Az alkalmazás meglévő agentbeszélgetését nyitjuk meg; saját chatmotor vagy automatikus modellezés nincs.
-- [x] Célzott tesztek, typecheck/build, izolált böngészős próba és friss független review elkészült. A korábbi helyi teljes fast-kör hibás; a hosted teljes kör az alább leírt platformfüggő teszt miatt bukott. A javítás visszaellenőrzése és a teljes CI kapu még folyamatban.
+- [x] Célzott tesztek, typecheck/build, izolált böngészős próba és friss független review elkészült. A helyi teljes fast-kör hibás; a hosted fast és integráció zöld, a teljes böngészős kapu még folyamatban.
 - [x] Saját fork PR: https://github.com/kratam/herdr-web-ui/pull/1, a `local/main-gg` ágra.
 - [ ] Merge/telepítés a zöld CI és tiszta review után a meglévő felhatalmazással; a felhasználói közös folyamatokat nem állítjuk le.
 
@@ -69,25 +69,14 @@ A telefonos agent-prep hiba külön diagnózis/javítás. 2026-10-26: Tamás ké
 
 ## Ellenőrzési állapot
 
-2026-10-26: 37 célzott unit teszt zöld; typecheck és build zöld. A döntési és a
-meglévő áttekintő böngészős regresszió izolált Herdr-sessionön zöld. Valódi emberi
-választ nem írtak, valódi agentet nem indítottak.
+2026-10-26: a döntési/usage/server-convention célzott kör 104/104, az agentnév-regresszió 8/8; typecheck és build zöld. Az új döntési és a meglévő áttekintő böngészős regresszió izolált desktop/mobil környezetben zöld. Valódi emberi választ nem írtak, valódi agentet nem indítottak.
 
-A teljes `bun run check fast` lefutott, de a 7265 tesztes unit-kör 18 hibás teszttel
-és 2 külön hibával állt meg. Vannak macOS-parancseltérések, meglévő böngészős
-lane-regisztrációs hibák és időtúllépések; a teljes csomagot nem állítjuk zöldnek,
-és valamennyi hibát sem minősítjük igazolt baseline-nak. A saját döntési tesztek
-a teljes körben is átmentek. A kezdeti Actions workflow-listázás üres volt, de a PR megnyitásakor a célág workflow-i elindultak. A CI állapotát a PR tényleges checkjei igazolják; a kezdeti listából nem következett a CI hiánya.
+A független review megállapításai javítva és visszaellenőrizve: hiányzó nyugta utáni helyreállítás, igazolt agentindítás utáni átmeneti olvasóhiba, teljes műveleti részletek és a tényleges indítási profilhoz tartozó kvóta kiválasztása. A teljes branch utolsó tiszta review-ja a 6761617a headre szólt; az azóta talált tabhúzási javítás külön visszaellenőrzést kap.
 
-A független review négy P2-t jelzett: hiányzó mapping után újrapróbálás, igazolt
-agentindítás után átmeneti olvasóhiba, hiányzó műveleti részletek és több fióknál
-félreérthető keretválasztás. Mindegyik kapott célzott javítást és ellenőrzést.
+A pusholt 960fab0e head hosted fast-köre 7258 pass / 0 fail / 14 skip (499 fájl); integráció és Windows zöld. A browser-main és browser-other több korábbi GG-integrációs eltérést tárt fel: az Áttekintés külön navigációs lépés, a kiválasztott háttér-pane nem mindig a látható pane, a natív tabok száma/sorrendje külön kezelendő, a host-load a kvóták mellett helyet foglal. A próbák az aktuális működést ellenőrzik, az eredeti fókusz-, input-, bezárási és mobilkövetelmények megmaradnak. A preferenciák próbája az újratöltés előtt megvárja a tényleges mentést, a telefon pedig felületen kapcsolja vissza a közös beállítást.
 
-A helyi frissítő fájlonként is futtatja a módosult unit teszteket. Emiatt a
-böngésző-lane macOS-en hibás GNU `date -Is` hívása hordozható UTC-formátumra
-váltott; a meglévő helyi GG-böngészőpróbák felkerültek a manual listára, ahol
-az új próba is szerepel. Nem változott workflow, runner, párhuzamosság vagy
-böngészős futtatási lista. A meglévő hét lane-teszt az eredeti öt hibából zöldre
-váltott; a script-konvenciók is zöldek.
+A tabhúzási regresszió valódi runtime-hibát is igazolt: a rögzített Áttekintés téglalapja eltolta a natív beszúrási indexet. A runtime most kizárólag a rendezhető natív tabok helyét számolja. A próba előbb bukott, a javítás után zöld; az Áttekintés első helyét külön ellenőrzi. A javított célzott UI-, konvenciós és tabsorrend-tesztek zöldek; a nagy böngészős kapu újrafutása folyamatban.
 
-A GitHub-hosted Linux unit-kör 7257 sikeres, 1 hibás és 14 kihagyott teszttel futott le. A `local 0.4.8 object bindings` meglévő tesztje a futtató gép platformjára hagyatkozott, de nem-Macen is macOS Meta-kombinációkat várt. Az azonos fájl az alapágban is szerepelt; Linux platformmal helyben ugyanaz a hiba reprodukálható. A teszt most külön, explicit macOS és nem-macOS bemenettel ellenőrzi a bindolható kombinációk megőrzését és a nem támogatottak elhagyását. A működő kód nem változott; mindkét futtatási platformon 32/32 célzott teszt zöld.
+A helyi teljes fast-kör legutóbb 7118 pass / 14 fail / 140 skip; ezt nem állítjuk zöldnek, és valamennyi hibát sem igazolt baseline-nak. A macOS hosted jobot egy runner sem vette fel (kapacitáshiány), nem teszt futása közben bukott. Merge csak az új head kötelező hosted checkjei és tiszta független review után következhet.
+
+A saját fork CI_SELF_HOSTED_LABELS változója Tamás külön engedélyével a JSON-string "ubuntu-24.04"; nincs helyi CI/VM-módosítás. A helyi updater ugyancsak külön engedéllyel a meglévő `check run` futtatón át indítja a böngészőpróbákat, izolált sessionnel és takarítással. A még futó alkalmazás verziója változatlan.
