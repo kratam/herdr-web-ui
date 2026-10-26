@@ -7,9 +7,9 @@ import panes from "../site/demo/fixtures/panes.json";
 import { buildDemoApp } from "./demo-build.ts";
 import { chromePath } from "./chrome-path.ts";
 
-// #1457: with the keyboard up a phone is short enough to drop a lone tab's row, and the chat then
-// puts the glass header over the pane. The pane's own menu button must start below that header,
-// never under its More button (six dots, not three), and a banner (View only) must not cover it.
+// #1457: billentyűzettel és View only bannerrel se fedje el a fejléc a pane műveletmenüjét.
+// A GG-fork rögzített Áttekintés tabja miatt egyetlen natív tabnál is megmarad a tabsor;
+// a pane műveleteit ilyenkor a tabsor menüje adja.
 type SocketsWindow = Window & { glassSockets: WebSocket[] };
 
 /** Keeps the demo's sockets, so the check can turn this connection into a view-only one. */
@@ -70,7 +70,7 @@ try {
         page.on("pageerror", (error) => errors.push(error.message));
         await page.goto(`http://127.0.0.1:${server.port}/herdr-web-ui/demo/app/?pane=${encodeURIComponent(panes.api)}`);
         await page.locator(".conn-live").waitFor();
-        // A short phone draws no tab row for a workspace's only tab: close the pane's sibling tabs.
+        // A fixture egyetlen natív tabja mellett a GG-áttekintő is megmarad.
         const closed = await page.evaluate(async (id) => {
           const { snapshot } = await (await fetch("/api/session")).json() as { snapshot: { panes: { pane_id: string; tab_id: string; workspace_id: string }[]; tabs: { tab_id: string; workspace_id: string }[] } };
           const own = snapshot.panes.find((pane) => pane.pane_id === id)!;
@@ -82,7 +82,8 @@ try {
           return others.length;
         }, panes.api);
         assert.ok(closed > 0, "the demo pane's workspace had another tab to close");
-        await page.waitForFunction(() => document.querySelectorAll(".tab-strip-item").length === 1);
+        await page.waitForFunction(() => document.querySelectorAll(".tab-strip-tab[data-tab-id]").length === 1);
+        assert.equal(await page.getByRole("tab", { name: "Áttekintés", exact: true }).count(), 1);
 
         await page.getByTitle("Chat transcript (⌘⇧J)", { exact: true }).click();
         const message = page.getByRole("textbox", { name: "Message", exact: true });
@@ -90,35 +91,36 @@ try {
         assert.equal(await page.locator(".pane-frame.is-single .pane-frame-menu").isVisible(), false,
           "upright, the lone tab keeps its row, whose menu carries the pane's actions");
 
-        // the report's own moment: the message box focused and the keyboard up. Android shrinks the
-        // layout viewport with it, under the 600px that drops a lone tab's row (TabStrip's cramped).
+        // Az Android-billentyűzet 600 px alá csökkenti a viewportot; a GG-tabsor ekkor is látható.
         await message.click();
         await page.setViewportSize({ width: 390, height: 470 });
         await page.evaluate(() => (window as Window & { glassViewport?: (value: number) => void }).glassViewport?.(470));
         await page.waitForFunction(() => document.documentElement.hasAttribute("data-keyboard"));
-        await page.locator(".tab-strip").waitFor({ state: "detached" });
-        assert.notEqual(await page.locator(".app-header").evaluate((node) => getComputedStyle(node).backdropFilter), "none",
-          "the chat of a lone tab with no row puts the glass header over the pane");
+        await page.locator(".tab-strip").waitFor();
+        assert.equal(await page.locator(".pane-frame.is-single .pane-frame-menu").isVisible(), false,
+          "the retained GG tab row owns the pane actions on a short phone too");
         await checkMenus(page, "chat-keyboard");
 
         // a view-only connection draws its "View only" banner at the pane's top right too
         await page.evaluate(() => (window as SocketsWindow).glassSockets.at(-1)!.send(JSON.stringify({ type: "role", mode: "observe" })));
         await page.locator(".terminal-banner-observe").waitFor();
-        await page.locator(".tab-strip").waitFor({ state: "detached" });
+        await page.locator(".tab-strip").waitFor();
         await checkMenus(page, "chat-keyboard-view-only");
         const banners = await page.locator(".terminal-banners > :not(.visually-hidden)").evaluateAll((nodes) => nodes.map((node) => {
           const box = node.getBoundingClientRect();
           return { x: box.x, y: box.y, width: box.width, height: box.height, text: node.textContent?.trim() ?? "" };
         }).filter((box) => box.width > 0 && box.height > 0));
         assert.ok(banners.some((banner) => banner.text === "View only"), `the View only banner is drawn (${JSON.stringify(banners)})`);
-        const menu = await page.locator(".pane-frame.is-single .pane-frame-menu").boundingBox();
+        const menu = await page.locator(".tab-strip-menu").boundingBox();
         if (!menu) throw new Error("the lone pane's menu has a box");
         for (const banner of banners) {
           const overlaps = menu.x < banner.x + banner.width && banner.x < menu.x + menu.width && menu.y < banner.y + banner.height && banner.y < menu.y + menu.height;
           assert.equal(overlaps, false, `the banner "${banner.text}" ${JSON.stringify(banner)} covers the lone pane's menu ${JSON.stringify(menu)}`);
         }
-        assert.equal(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest(".pane-frame-menu") instanceof HTMLElement, { x: menu.x + menu.width / 2, y: menu.y + menu.height / 2 }), true,
+        assert.equal(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest(".tab-strip-menu") instanceof HTMLElement, { x: menu.x + menu.width / 2, y: menu.y + menu.height / 2 }), true,
           "a press on the lone pane's menu reaches it, not a banner over it");
+        await page.locator(".tab-strip-menu").click();
+        await page.locator('.row-sheet[role="dialog"]').waitFor();
         assert.deepEqual(errors, []);
       } finally { await context.close(); }
     } finally { await browser.close(); }
@@ -131,7 +133,7 @@ try {
 async function checkMenus(page: Page, label: string): Promise<void> {
   const header = await page.locator(".app-header").boundingBox();
   const more = await page.locator(".header-more-button").boundingBox();
-  const paneMenu = page.locator(".pane-frame.is-single .pane-frame-menu");
+  const paneMenu = page.locator(".tab-strip-menu");
   if (!header || !more) throw new Error(`${label}: the header and its More button are drawn`);
   assert.equal(await paneMenu.isVisible(), true, `${label}: a finger keeps the lone pane's own menu`);
   const pane = await paneMenu.boundingBox();
