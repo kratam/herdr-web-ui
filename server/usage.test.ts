@@ -117,6 +117,21 @@ describe("indítási profil kerete", () => {
     write(join(home, ".claude", ".credentials.json"), { claudeAiOauth: { accessToken: "default", expiresAt: NOW + HOUR } });
     expect((await new UsageService(context(), only("claude")).forLaunch())[0]!.env).toEqual({ CLAUDE_CONFIG_DIR: "" });
   });
+
+  it("azonos token két helyen sem tünteti el a tényleges Codex vagy Claude indítási profilt", async () => {
+    signInCodex(); signInCodex(NOW / 1000 + HOUR / 1000, ".config/codex");
+    replies.set(CODEX_USAGE, codexReply(5));
+    const codex = new UsageService(context(), only("codex"));
+    expect((await codex.forLaunch())[0]!.env).toEqual({ CODEX_HOME: join(home, ".codex") });
+    expect(requests.filter(request => request.url === CODEX_USAGE)).toHaveLength(1);
+    const credential = { claudeAiOauth: { accessToken: "same", expiresAt: NOW + HOUR } };
+    write(join(home, ".claude", ".credentials.json"), credential);
+    write(join(home, ".claude-secondary", ".credentials.json"), credential);
+    replies.set("https://api.anthropic.com/api/oauth/usage", { body: { seven_day: { utilization: 10 } } });
+    const claude = new UsageService({ ...context(), env: { CLAUDE_CONFIG_DIR: join(home, ".claude-secondary") } }, only("claude"));
+    expect((await claude.forLaunch())[0]!.env).toEqual({ CLAUDE_CONFIG_DIR: join(home, ".claude-secondary") });
+    expect(requests.filter(request => request.url.includes("anthropic"))).toHaveLength(1);
+  });
 });
 
 describe("providers", () => {
