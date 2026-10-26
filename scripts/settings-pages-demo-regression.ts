@@ -14,6 +14,7 @@ import { terminalTheme } from "../src/lib/settings.ts";
 import { THEME_IDS, type ThemeId } from "../src/lib/themes.ts";
 import baseline from "../src/lib/themes.legacy-baseline.json";
 import { comboKey, LEGACY_COMBOS } from "./theme-baseline.ts";
+import { SHEET_HISTORY_KEY } from "../src/lib/historyKeys.ts";
 
 // Settings on the unmodified app over the demo's fixture transport: every page fits a phone, and
 // the browser's Back button steps out of the dialog instead of out of the app. All files and
@@ -184,6 +185,12 @@ async function settingsSearch(browser: import("playwright-core").Browser, url: s
           // the next row opens Settings again: its close's step back lands first
           await page.waitForFunction(() => (history.state as Record<string, unknown> | null)?.["ovis:settings"] === undefined);
         };
+        const closePalette = async (): Promise<void> => {
+          await page.keyboard.press("Escape");
+          await page.locator(".command-palette").waitFor({ state: "detached" });
+          // A mobil paletta eltűnése után az előzménylépés még folyamatban lehet.
+          await page.waitForFunction(key => !history.state?.[key], SHEET_HISTORY_KEY);
+        };
         for (const [rowLanguage, query, expectedPage, expectedSection] of MATRIX) {
           if (rowLanguage !== language) continue;
           const before = await focusName(page);
@@ -210,8 +217,7 @@ async function settingsSearch(browser: import("playwright-core").Browser, url: s
             overflow = await sideways(page);
             await close();
           } else {
-            await page.keyboard.press("Escape");
-            await page.locator(".command-palette").waitFor({ state: "detached" });
+            await closePalette();
           }
           focusReturned = await focusName(page) === before;
           const pass = shown.page === expectedPage && (expectedSection === "-" || (shown.section === expectedSection && shown.visible === true)) && overflow.length === 0 && focusReturned;
@@ -223,8 +229,7 @@ async function settingsSearch(browser: import("playwright-core").Browser, url: s
           await openPalette(page, query);
           const settingsRows = await page.locator(".palette-section[data-section='settings-pages'] [role='option']").count();
           const overflow = await sideways(page);
-          await page.keyboard.press("Escape");
-          await page.locator(".command-palette").waitFor({ state: "detached" });
+          await closePalette();
           await openSettings(page);
           const opened = await landing(page, label);
           const steps: { page: string | null; section: string | null }[] = [opened];
@@ -896,8 +901,9 @@ try {
         if (process.env.UI_EVIDENCE_DIR) await page.screenshot({ path: join(process.env.UI_EVIDENCE_DIR, "select-arrows-desktop.png"), animations: "disabled" });
         const themePicker = page.getByLabel("Dark theme", { exact: true });
         await themePicker.focus();
-        await page.keyboard.press("ArrowDown");
-        assert.notEqual(await themePicker.inputValue(), "amber", "the native select keeps keyboard selection");
+        // A natív karakteres választás nem függ a platform felugró menüjének nyílbillentyűitől.
+        await themePicker.press("v");
+        assert.equal(await themePicker.inputValue(), "vesper", "the native select keeps keyboard selection");
         await themePicker.selectOption("amber");
         await page.emulateMedia({ forcedColors: "active" });
         assert.equal(await themePicker.evaluate((select) => getComputedStyle(select).appearance), "auto", "forced colors restores the native indicator");

@@ -6,6 +6,7 @@ import type { Browser, Page } from "playwright-core";
 import { appFaces } from "./app-faces.ts";
 import { herdrRpc, paneSplit, tabCreate, workspaceClose, workspaceCreate } from "../server/herdr/client.ts";
 import { chromePath } from "./chrome-path.ts";
+import { SHEET_HISTORY_KEY } from "../src/lib/historyKeys.ts";
 
 type Box = { left: number; top: number; right: number; bottom: number; width: number; height: number };
 type KeyboardQA = Window & { keyboardQA: (height: number | null) => void };
@@ -143,6 +144,8 @@ export async function checkMobileTabs(browser: Browser, origin: string): Promise
     assert.deepEqual(tabItems.slice(-4), ["Move tab right", "New tab with agent…", "Rename tab", "Close tab"], "the first tab offers only its available adjacent move, and the agent's dialog beside the strip's shell +");
     await tabSheet.getByRole("button", { name: "Cancel", exact: true }).tap();
     await tabSheet.waitFor({ state: "detached" });
+    // Az új navigáció csak a bezárt sheet saját előzménylépésének befejezése után induljon.
+    await page.waitForFunction(key => !window.history.state?.[key], SHEET_HISTORY_KEY);
 
     // The pane a tab and a workspace row were last seen on outlives a reload (a phone drops a page
     // left in the background): both open the split pane last seen, not the one herdr has in front.

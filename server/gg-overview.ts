@@ -39,7 +39,7 @@ export function projectCoreStatus(value: unknown): Pick<GgOverview, "tasks" | "d
   for (const raw of data.questions) {
     const item = record(raw);
     if (item.state !== "pending" || !taskIds.has(String(item.task_id))) continue;
-    const id = str(item.question_key), taskId = str(item.task_id), text = str(item.text, 8000);
+    const id = str(item.id) ?? str(item.question_key), taskId = str(item.task_id), text = str(item.text, 8000);
     if (!id || !taskId || !text) throw Error("invalid_decision");
     const proposal = record(item.proposal);
     const proposalText = [str(proposal.label, 4000), str(proposal.rationale, 8000)].filter(Boolean).join("\n\n") || str(item.proposal, 8000);
@@ -100,6 +100,7 @@ export class GgOverviewService {
   private nextRead = 0;
   private inFlight: Promise<GgOverview> | null = null;
   constructor(private readonly options: { now?: () => number; load?: () => Promise<unknown>; mappings?: () => Record<string, GgRepository>; roots?: () => Promise<Record<string, string>> } = {}) {}
+  async invalidate(): Promise<void> { await this.inFlight; this.nextRead = 0; }
   read(): Promise<GgOverview> {
     const now = (this.options.now ?? Date.now)();
     if (this.inFlight) return this.inFlight;

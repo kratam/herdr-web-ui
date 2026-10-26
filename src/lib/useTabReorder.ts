@@ -107,7 +107,8 @@ export function useTabReorder({ owner, tabs, strip, moveTab, failed, stale, outs
   const boundaryAt = (held: Press): number | null => {
     const row = strip.current;
     if (!row || !overStrip(held) || current.current.ids.length < 2) return null;
-    const rects = [...row.querySelectorAll<HTMLElement>(".tab-strip-item")].map((item) => item.getBoundingClientRect());
+    // A rögzített Áttekintés nem natív tab: nem tolhatja el a Herdr-be küldött beszúrási indexet.
+    const rects = [...row.querySelectorAll<HTMLElement>(".tab-strip-item[data-reorder-tab]")].map((item) => item.getBoundingClientRect());
     return tabDropBoundary(rects, held.x);
   };
   const paintDrag = (held: Press): void => {

@@ -45,7 +45,13 @@ try {
           await page.locator(".conn-live").waitFor();
           await page.locator(".composer-text").first().waitFor();
           await page.keyboard.press("Meta+Shift+Digit2");
-          await page.waitForFunction(previous => document.querySelector(".pane-frame.is-current")?.getAttribute("data-layout-pane") !== previous, panes.api);
+          await page.waitForFunction(previous => document.querySelector(".gg-overview") !== null || Boolean(document.querySelector(".pane-frame.is-current")?.getAttribute("data-layout-pane") && document.querySelector(".pane-frame.is-current")?.getAttribute("data-layout-pane") !== previous), panes.api);
+          // A GG-áttekintő önálló navigációs lépés; a fókuszpróba a következő valódi pane-t vizsgálja.
+          if (await page.locator(".gg-overview").isVisible()) await page.keyboard.press("Meta+Shift+Digit2");
+          await page.waitForFunction(previous => {
+            const current = document.querySelector(".pane-frame.is-current")?.getAttribute("data-layout-pane");
+            return Boolean(current && current !== previous);
+          }, panes.api);
           // selecting a pane still focuses chat on a desktop and leaves a touch screen alone
           const wanted = !touch;
           await page.waitForFunction(wanted => !!document.querySelector(".pane-frame.is-current .composer-text:focus") === wanted, wanted);

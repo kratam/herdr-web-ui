@@ -56,8 +56,11 @@ async function checkFiles(page: Page, label: string, phone: boolean, paneA: stri
   await dialog.locator(".dir-browser-item", { hasText: "sub" }).click();
   await page.waitForFunction((folder) => document.querySelector(".files-dialog .dir-browser-path")?.getAttribute("title") === folder, join(cwdA, "sub"));
   await page.screenshot({ path: join(shots, `files-${label}-before-switch.png`) });
-  await page.keyboard.press("Control+Shift+ArrowDown");
+  await page.keyboard.press("ControlOrMeta+Shift+ArrowDown");
   await page.waitForFunction((id) => JSON.parse(sessionStorage.getItem("ovis:selection") ?? "null")?.pane_id === id, paneB);
+  // Az áttekintő is a következő workspace pane-jét tartja a selectionben, de még nem mutatja azt.
+  if (await page.locator(".gg-overview").isVisible()) await page.keyboard.press("ControlOrMeta+Shift+ArrowDown");
+  await page.locator(`.pane-frame.is-current[data-layout-pane="${paneB}"]`).waitFor();
   const outcome = await page.waitForFunction((folder) => {
     const current = document.querySelector(".files-dialog");
     return current === null ? "closed" : current.querySelector(".dir-browser-path")?.getAttribute("title") === folder ? "followed" : false;
