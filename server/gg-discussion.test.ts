@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { GgDiscussionService, selectDiscussionAgent, type DiscussionIdentity } from "./gg-discussion.ts";
 import type { GgDecisionDetail } from "../shared/gg-decisions.ts";
 import { PendingInputError } from "./pending-input.ts";
+import { AGENT_NAME_PATTERN } from "../shared/agent-name.ts";
 
 const roots: string[] = [];
 afterEach(() => { for (const path of roots.splice(0)) rmSync(path, { recursive: true, force: true }); });
@@ -14,20 +15,21 @@ const identity: DiscussionIdentity = { pane_id: "w1:p3", terminal_id: "terminal-
 function setup() {
   const root = mkdtempSync(join(tmpdir(), "ovis-decision-test-")); roots.push(root);
   let live: DiscussionIdentity | null = null, creates = 0, starts = 0;
-  const prompts: string[] = [];
+  const prompts: string[] = [], names: string[] = [];
   const deps = {
     inspect: async () => live,
     create: async () => { creates++; return { pane_id: identity.pane_id, terminal_id: identity.terminal_id }; },
     choose: async () => ({ kind: "claude" as const, args: ["--model", "sonnet"], env: { CLAUDE_CONFIG_DIR: "" } }),
-    start: async (_pane: string, _choice: unknown, name: string) => { starts++; live = { ...identity, name }; return true; },
+    start: async (_pane: string, _choice: unknown, name: string) => { starts++; names.push(name); live = { ...identity, name }; return true; },
     queue: async (_pane: string, prompt: string) => { prompts.push(prompt); return true; },
   };
-  return { root, deps, service: new GgDiscussionService(root, deps), prompts, stats: () => ({ creates, starts }), replace: (next: DiscussionIdentity | null) => { live = next; } };
+  return { root, deps, service: new GgDiscussionService(root, deps), prompts, names, stats: () => ({ creates, starts }), replace: (next: DiscussionIdentity | null) => { live = next; } };
 }
 it("két egyidejű kattintás egy tabot és egy döntési üzenetet hoz létre, újraindítás után is ugyanazt használja", async () => {
   const fixture = setup();
   const [a, b] = await Promise.all([fixture.service.open(question, "page"), fixture.service.open(question, "page")]);
   expect(a.pane_id).toBe(b.pane_id); expect(fixture.stats()).toEqual({ creates: 1, starts: 1 }); expect(fixture.prompts).toHaveLength(1);
+  expect(fixture.names[0]).toMatch(AGENT_NAME_PATTERN);
   const reopened = new GgDiscussionService(fixture.root, fixture.deps);
   await reopened.open({ ...question, binding: { ...question.binding, decision_id: "e604002f-2993-4675-9c68-4808a010f809" } }, "page");
   expect(fixture.stats()).toEqual({ creates: 1, starts: 1 }); expect(fixture.prompts).toHaveLength(2);

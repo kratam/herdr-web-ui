@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { AGENT_NAME_MAX_LENGTH } from "../shared/agent-name.ts";
 import { unlinkSync } from "node:fs";
 import type { GgDecisionDetail, GgDiscussionReceipt } from "../shared/gg-decisions.ts";
 import type { UsageLaunchProfile } from "./usage.ts";
@@ -93,7 +94,7 @@ export class GgDiscussionService {
     }
     if (!state) {
       const agent = await this.deps.choose();
-      state = { version: 1, phase: "creating", name: "gg-decisions-" + randomUUID(), agent: agent.kind, pane: null, identity: null, delivered: [], delivering: null };
+      state = { version: 1, phase: "creating", name: ("gg-decisions-" + randomUUID().replaceAll("-", "")).slice(0, AGENT_NAME_MAX_LENGTH), agent: agent.kind, pane: null, identity: null, delivered: [], delivering: null };
       this.save(state);
       try { state.pane = await this.deps.create(agent); }
       catch (error) {
