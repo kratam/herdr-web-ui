@@ -2,16 +2,16 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { unlinkSync } from "node:fs";
 import type { GgDecisionDetail, GgDiscussionReceipt } from "../shared/gg-decisions.ts";
-import type { UsageReport } from "../shared/usage.ts";
+import type { UsageLaunchProfile } from "./usage.ts";
 import { readStateDocument, writeStateDocument } from "./state-document.ts";
 import { PendingInputError, samePendingIdentity } from "./pending-input.ts";
 
 export interface DiscussionIdentity { pane_id: string; terminal_id: string; agent: string; name: string; process_pid: number; process_birth: number; session: string | null }
-export interface DiscussionAgent { kind: "claude" | "codex"; args: string[] }
+export interface DiscussionAgent { kind: "claude" | "codex"; args: string[]; env: Record<string, string> }
 export interface DiscussionDeps {
   /** null kizárólag akkor, ha a pane bizonyíthatóan bezárult. Az olvasási hiba kivétel. */
   inspect(paneId: string): Promise<DiscussionIdentity | null>;
-  create(): Promise<{ pane_id: string; terminal_id: string }>;
+  create(agent: DiscussionAgent): Promise<{ pane_id: string; terminal_id: string }>;
   choose(): Promise<DiscussionAgent>;
   start(paneId: string, agent: DiscussionAgent, name: string): Promise<boolean>;
   queue(paneId: string, prompt: string, kind: string, connection: string, pid: number): Promise<boolean>;
@@ -28,20 +28,17 @@ interface DiscussionState {
 }
 
 /** Csak az új beszélgetéshez választunk: a már futó agent modelljéhez nem nyúlunk. */
-export function selectDiscussionAgent(value: UsageReport, now: number): DiscussionAgent {
-  const candidates = value.providers.filter(provider => {
+export function selectDiscussionAgent(profiles: readonly UsageLaunchProfile[], now: number): DiscussionAgent {
+  const candidates = profiles.filter(({ usage: provider }) => {
     if (!["claude", "codex"].includes(provider.id) || provider.problem || !provider.checked_at) return false;
-    // Az indító nem választ credential-profilt. Több mért fiókból nem találjuk ki,
-    // melyiket örökölné a CLI; ilyen szolgáltatóból automatikusan nem indítunk.
-    if (new Set(value.providers.filter(row => row.id === provider.id).map(row => row.key)).size !== 1) return false;
     const age = now - Date.parse(provider.checked_at);
     if (!Number.isFinite(age) || age < -60_000 || age > 10 * 60_000) return false;
     const relevant = provider.windows.filter(window => window.scope === null || /sonnet/i.test(window.scope));
     return relevant.some(window => window.kind === "week" && window.scope === null) && relevant.every(window => Number.isFinite(window.used_percent) && window.used_percent >= 0 && window.used_percent < 100);
-  }).sort((a, b) => a.windows.find(w => w.kind === "week" && w.scope === null)!.used_percent - b.windows.find(w => w.kind === "week" && w.scope === null)!.used_percent);
+  }).sort((a, b) => a.usage.windows.find(w => w.kind === "week" && w.scope === null)!.used_percent - b.usage.windows.find(w => w.kind === "week" && w.scope === null)!.used_percent);
   const chosen = candidates[0];
   if (!chosen) throw Error("discussion_quota_unavailable");
-  return chosen.id === "claude" ? { kind: "claude", args: ["--model", "sonnet", "--effort", "high"] } : { kind: "codex", args: ["-m", "gpt-6.1-sol", "--effort", "medium"] };
+  return chosen.usage.id === "claude" ? { kind: "claude", args: ["--model", "sonnet", "--effort", "high"], env: chosen.env } : { kind: "codex", args: ["-m", "gpt-6.1-sol", "--effort", "medium"], env: chosen.env };
 }
 
 function prompt(detail: GgDecisionDetail): string {
@@ -98,7 +95,7 @@ export class GgDiscussionService {
       const agent = await this.deps.choose();
       state = { version: 1, phase: "creating", name: "gg-decisions-" + randomUUID(), agent: agent.kind, pane: null, identity: null, delivered: [], delivering: null };
       this.save(state);
-      try { state.pane = await this.deps.create(); }
+      try { state.pane = await this.deps.create(agent); }
       catch (error) {
         // A hiányzó mapping a runtime-ban minden Herdr-művelet ELŐTT derül ki.
         if (error instanceof Error && error.message === "discussion_workspace_missing") unlinkSync(this.path);

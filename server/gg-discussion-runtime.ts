@@ -23,15 +23,15 @@ export function discussionRuntime(root: string, usage: UsageService, queue: (pan
   };
   return new GgDiscussionService(root, {
     inspect,
-    choose: async () => selectDiscussionAgent(await usage.report(), Date.now()),
-    create: async () => {
+    choose: async () => selectDiscussionAgent(await usage.forLaunch(), Date.now()),
+    create: async (agent) => {
       const cwd = repositoryMappings()["GuestGuru/gg-agent-skills"]?.path;
       if (!cwd) throw Error("discussion_workspace_missing");
       const snapshot = await sessionSnapshot();
       const existing = snapshot.panes.find(pane => pane.cwd === cwd);
       const created = existing
-        ? await tabCreate({ workspaceId: existing.workspace_id, cwd, label: "Döntések átbeszélése" })
-        : await workspaceCreate({ cwd, label: "Döntések átbeszélése" });
+        ? await tabCreate({ workspaceId: existing.workspace_id, cwd, label: "Döntések átbeszélése", env: agent.env })
+        : await workspaceCreate({ cwd, label: "Döntések átbeszélése", env: agent.env });
       if (!created.root_pane.terminal_id) throw Error("discussion_start_unconfirmed");
       return { pane_id: created.root_pane.pane_id, terminal_id: created.root_pane.terminal_id };
     },

@@ -32,8 +32,10 @@ idempotens kérést ellenőrzi. Mentés után a közös áttekintő cache érvé
 A **Beszéljük át** ugyanazt a **Döntések átbeszélése** Herdr-tabot használja, a
 `gg-agent-skills` konfigurált fő checkoutjában. Első kattintásra friss, ismert heti
 kerettel rendelkező normál agent indul; a meglévő beszélgetés nem vált modellt.
-Több mért fiók esetén abból a szolgáltatóból nem választ automatikusan: a mért
-fiókot a jelenlegi indító nem köti credential-profilhoz.
+A választás csak az indítandó CLI konfigurált profiljának mérését használja,
+nem a kijelzőn megjelenő többi fiókét. Ugyanazt a nem titkos profilútvonalat
+adja át az új tab környezetében; globális konfigurációt nem módosít. Hiányzó
+vagy nem mért elsődleges profil helyett egy tartalék fiók kerete nem használható.
 A kontextust az Ovis meglévő, a böngésző és a futó session azonosságához kötött
 üzenetsora adja át. A tényleges emberi választ az agent-decisions skill kezeli.
 Interaktív koordinátorok saját kérdései továbbra is a saját beszélgetésükben maradnak.

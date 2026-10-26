@@ -36,7 +36,7 @@ try {
     items: questions.map(question => ({ id: question.task_id, title: "Próba " + question.story_identifier, story_identifier: question.story_identifier, state: "waiting", package_state: "active", working_repositories: [{ repository: "GuestGuru/fixture" }] })), questions }) });
   const discussion = new GgDiscussionService(root, {
     inspect: async () => live,
-    choose: async () => ({ kind: "claude", args: [] }),
+    choose: async () => ({ kind: "claude", args: [], env: {} }),
     create: async () => { creates++; const tab = await tabCreate({ workspaceId: workspace!, cwd: root, label: "Döntések átbeszélése" }); discussionPane = tab.root_pane.pane_id; return { pane_id: discussionPane, terminal_id: tab.root_pane.terminal_id! }; },
     start: async (_pane, _agent, name) => { const pane = (await sessionSnapshot()).panes.find(pane => pane.pane_id === discussionPane)!; live = { pane_id: discussionPane, terminal_id: pane.terminal_id!, agent: "claude", name, process_pid: 123, process_birth: 456, session: "test-session" }; return true; },
     queue: async () => { prompts++; return true; },

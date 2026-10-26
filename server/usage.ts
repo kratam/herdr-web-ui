@@ -935,6 +935,9 @@ interface Search {
   sources: string[];
 }
 
+/** Egy CLI tényleges profiljának mérése és ugyanazon profil nem titkos indítási környezete. */
+export interface UsageLaunchProfile { usage: ProviderUsage; env: Record<string, string> }
+
 export class UsageService {
   /** A local CLI login ended: rediscover sign-ins, preserving account rate-limit backoffs. */
   invalidate(): void { this.searches.clear(); this.entries.clear(); }
@@ -961,6 +964,21 @@ export class UsageService {
     this.pending = pass;
     this.pendingRefresh = refresh;
     return pass;
+  }
+
+  /** A többfiókos kijelzőből nem következtetünk indítási profilra; csak a pontos forrást használjuk. */
+  async forLaunch(): Promise<UsageLaunchProfile[]> {
+    await this.report();
+    const codexHome = this.ctx.env["CODEX_HOME"] || join(this.ctx.home, ".codex");
+    const claudeHome = this.ctx.env["CLAUDE_CONFIG_DIR"] || "";
+    const sources: Array<{ key: string; env: Record<string, string> }> = [
+      { key: `codex|${codexHome}`, env: { CODEX_HOME: codexHome } },
+      { key: `claude|${claudeHome || "default"}`, env: { CLAUDE_CONFIG_DIR: claudeHome } },
+    ];
+    return sources.flatMap(({ key, env }): UsageLaunchProfile[] => {
+      const usage = this.entries.get(key)?.usage;
+      return usage ? [{ usage, env }] : [];
+    });
   }
 
   private async collect(refresh: boolean): Promise<UsageReport> {

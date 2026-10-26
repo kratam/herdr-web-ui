@@ -18,7 +18,7 @@ function setup() {
   const deps = {
     inspect: async () => live,
     create: async () => { creates++; return { pane_id: identity.pane_id, terminal_id: identity.terminal_id }; },
-    choose: async () => ({ kind: "claude" as const, args: ["--model", "sonnet"] }),
+    choose: async () => ({ kind: "claude" as const, args: ["--model", "sonnet"], env: { CLAUDE_CONFIG_DIR: "" } }),
     start: async (_pane: string, _choice: unknown, name: string) => { starts++; live = { ...identity, name }; return true; },
     queue: async (_pane: string, prompt: string) => { prompts.push(prompt); return true; },
   };
@@ -55,8 +55,8 @@ it("az induláshoz a tényleges heti keretet nézi; elfogyott vagy nem mért ker
   const now = Date.now(), checked_at = new Date(now).toISOString();
   const providers = ["codex", "claude"].map((id, index) => ({ id: id as "codex" | "claude", key: id, account: null, plan: null, problem: null,
     checked_at, windows: [{ kind: "week" as const, scope: null, used_percent: index ? 89 : 100, resets_at: null, starts_at: null }] }));
-  expect(selectDiscussionAgent({ providers }, now).kind).toBe("claude");
-  expect(() => selectDiscussionAgent({ providers: [] }, now)).toThrow("discussion_quota_unavailable");
+  expect(selectDiscussionAgent(providers.map(usage => ({ usage, env: {} })), now).kind).toBe("claude");
+  expect(() => selectDiscussionAgent([], now)).toThrow("discussion_quota_unavailable");
 });
 it("Ovis-újraindítás után nem állítja kézbesítettnek a régi memóriabeli üzenetet", async () => {
   const fixture = setup(); await fixture.service.open(question, "page");
@@ -83,10 +83,17 @@ it("hiányzó mapping javítása után indulhat; egyszeri indulás utáni olvas�
   const recovered = await fixture.service.open(question, "page"); expect(recovered.queued).toBeTrue();
   expect(fixture.stats()).toEqual({ creates: 1, starts: 1 }); expect(fixture.prompts).toHaveLength(1);
 });
-it("második fiók szabad kerete nem indítja el az alapértelmezett, kimerült CLI-fiókot", () => {
+it("az igazolt profil környezetét adja tovább, és kimerült profilt nem választ", async () => {
   const now = Date.now(), checked_at = new Date(now).toISOString();
-  const account = (id: "codex" | "claude", key: string, used_percent: number) => ({ id, key, account: null, plan: null, problem: null, checked_at, windows: [{ kind: "week" as const, scope: null, used_percent, resets_at: null, starts_at: null }] });
-  const codex = [account("codex", "default", 100), account("codex", "secondary", 5)];
-  expect(selectDiscussionAgent({ providers: [...codex, account("claude", "claude-default", 40)] }, now).kind).toBe("claude");
-  expect(() => selectDiscussionAgent({ providers: codex }, now)).toThrow("discussion_quota_unavailable");
+  const usage = { id: "codex" as const, key: "codex:default", account: null, plan: null, problem: null, checked_at, windows: [{ kind: "week" as const, scope: null, used_percent: 5, resets_at: null, starts_at: null }] };
+  const profile = { usage, env: { CODEX_HOME: "/fixture/codex-primary" } };
+  const agent = selectDiscussionAgent([profile], now);
+  expect(agent.kind).toBe("codex"); expect(agent.env).toEqual(profile.env);
+  expect(() => selectDiscussionAgent([{ ...profile, usage: { ...usage, windows: [{ ...usage.windows[0]!, used_percent: 100 }] } }], now)).toThrow("discussion_quota_unavailable");
+  const fixture = setup();
+  const environments: Record<string, string>[] = [];
+  const create = fixture.deps.create;
+  const service = new GgDiscussionService(fixture.root, { ...fixture.deps, choose: async () => agent, create: async selected => { environments.push(selected.env); return create(); } });
+  await service.open(question, "page");
+  expect(environments).toEqual([profile.env]);
 });

@@ -87,6 +87,38 @@ beforeEach(() => {
 
 afterEach(() => rmSync(home, { recursive: true, force: true }));
 
+describe("indítási profil kerete", () => {
+  it("egyetlen secondary fiók nem azonos az alapértelmezett indítási profillal", async () => {
+    signInCodex(NOW / 1000 + 3600, ".codex-secondary", "secondary");
+    replies.set(CODEX_USAGE, codexReply(5));
+    const service = new UsageService(context(), only("codex"));
+    expect((await service.report()).providers).toHaveLength(1);
+    expect(await service.forLaunch()).toEqual([]);
+  });
+
+  it("csak a kiválasztott CLI-home mérését és ugyanannak a home-nak az indítását kapcsolja össze", async () => {
+    signInCodex(NOW / 1000 + 3600, ".codex", "default");
+    signInCodex(NOW / 1000 + 3600, ".codex-secondary", "secondary");
+    replies.set(CODEX_USAGE, codexReply(5));
+    const defaultService = new UsageService(context(), only("codex"));
+    const profiles = await defaultService.forLaunch();
+    expect(profiles.map(profile => profile.usage.key)).toEqual(["codex:default__acct-1"]);
+    expect(profiles[0]!.env).toEqual({ CODEX_HOME: join(home, ".codex") });
+    const custom = new UsageService({ ...context(), env: { CODEX_HOME: join(home, ".codex-secondary") } }, only("codex"));
+    expect((await custom.forLaunch()).map(profile => [profile.usage.key, profile.env])).toEqual([["codex:secondary__acct-1", { CODEX_HOME: join(home, ".codex-secondary") }]]);
+  });
+
+  it("Claude default és konfigurált profilja külön marad, a hiányzó default nem vesz fel siblinget", async () => {
+    write(join(home, ".claude-secondary", ".credentials.json"), { claudeAiOauth: { accessToken: "secondary", expiresAt: NOW + HOUR } });
+    replies.set("https://api.anthropic.com/api/oauth/usage", { body: { seven_day: { utilization: 10 } } });
+    expect(await new UsageService(context(), only("claude")).forLaunch()).toEqual([]);
+    const custom = new UsageService({ ...context(), env: { CLAUDE_CONFIG_DIR: join(home, ".claude-secondary") } }, only("claude"));
+    expect((await custom.forLaunch())[0]!.env).toEqual({ CLAUDE_CONFIG_DIR: join(home, ".claude-secondary") });
+    write(join(home, ".claude", ".credentials.json"), { claudeAiOauth: { accessToken: "default", expiresAt: NOW + HOUR } });
+    expect((await new UsageService(context(), only("claude")).forLaunch())[0]!.env).toEqual({ CLAUDE_CONFIG_DIR: "" });
+  });
+});
+
 describe("providers", () => {
   it("lists nothing when no CLI is signed in, and asks no one", async () => {
     const report = await new UsageService(context("darwin")).report();

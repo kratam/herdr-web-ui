@@ -14,7 +14,7 @@ const messages: Record<string, string> = {
   capability_missing: "A döntéshez szükséges művelet még nem érhető el.",
   idempotency_conflict: "Ehhez a mentési azonosítóhoz már más válasz tartozik. Olvasd újra a döntést.",
   decision_not_found: "A kérdés már nem található ebben a storyban. Frissítsd az áttekintőt.",
-  discussion_quota_unavailable: "Most nincs egyértelműen igazolt szabad keret új agenthez. Elfogyott, nem mért vagy több fiókhoz tartozó keretből nem választunk automatikusan.",
+  discussion_quota_unavailable: "Most nincs egyértelműen igazolt szabad keret új agenthez. Csak az indítandó CLI-profil frissen mért szabad keretéből választunk.",
   discussion_workspace_missing: "A döntési beszélgetés munkakönyvtára nincs beállítva.",
   discussion_identity_changed: "A döntési tabon közben más session fut. Ellenőrizd a Döntések átbeszélése tabot; nem küldtünk neki üzenetet.",
   discussion_identity_unavailable: "A döntési tab futó sessionje most nem igazolható. Ellenőrizd a meglévő tabot.",
