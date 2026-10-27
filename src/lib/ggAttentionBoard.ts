@@ -19,6 +19,7 @@ function parkedBecause(task: GgTask, now: number): string | null {
   if (list.includes("after_gg3_launch")) return "a GG3-indulás után";
   if (list.some(reason => reason.startsWith("after_"))) return "mérföldkő után";
   if (list.includes("project_on_hold")) return "amíg a projekt On Hold";
+  if (list.includes("external_dependency_unresolved")) return "amíg a külső függőség nyitott";
   if (isGgSnoozed(task, now)) return "Későbbre téve: " + day(task.snoozed_until!);
   return null;
 }
@@ -65,7 +66,7 @@ export function buildAttentionBoard(feed: GgOverview, now: number): AttentionBoa
   });
 
   const planned = feed.tasks.filter(task => task.state === "planned" && !decisionTasks.has(task.id));
-  const parked = byStory(planned.filter(task => parkedBecause(task, now) !== null)).map(tasks => row(tasks, parkedBecause(tasks[0]!, now)!, reasons(tasks[0]!).join(", "), null));
+  const parked = byStory(planned.filter(task => parkedBecause(task, now) !== null)).map(tasks => row(tasks, parkedBecause(tasks[0]!, now)!, tasks.length > 1 ? tasks.length + " task" : "", null));
   const rest = planned.filter(task => parkedBecause(task, now) === null);
   const isCleanup = (task: GgTask) => { const value = taskAssessment(task); return value?.freshness === "current" && CLEANUP.includes(value.preparation ?? ""); };
   const cleanup = byStory(rest.filter(isCleanup)).map(tasks => row(tasks, "az agent ellenőrzi a kész-feltételt, és lezárást javasol", "", taskAssessment(tasks[0]!)));
@@ -75,7 +76,7 @@ export function buildAttentionBoard(feed: GgOverview, now: number): AttentionBoa
     const later = tasks.every(task => reasons(task).includes("later"));
     const state = !assessment ? "még nincs előkészítve" : (assessment.freshness === "stale" ? "elavult előkészítés: " : "előkészítve: ") + (assessment.assessed_at ? day(assessment.assessed_at) : "ismeretlen időpont");
     const meta = [state, tasks.length > 1 ? tasks.length + " task" : "", later ? "sor végén" : ""].filter(Boolean).join(" · ");
-    return { ...row(tasks, assessment?.freshness === "current" ? "döntési csomag készül" : "az agent előkészíti", meta, assessment), later };
+    return { ...row(tasks, "előkészítés döntésre", meta, assessment), later };
   });
   const rank = (tasks: GgTask[]) => Math.min(...tasks.map(task => task.priority || 5));
   soon.sort((a, b) => rank(a.tasks) - rank(b.tasks) || Number(a.later) - Number(b.later) || (b.age_days ?? 0) - (a.age_days ?? 0) || (a.story ?? "").localeCompare(b.story ?? ""));

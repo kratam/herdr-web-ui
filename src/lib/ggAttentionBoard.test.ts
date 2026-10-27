@@ -24,6 +24,11 @@ describe("Áttekintés-besorolás", () => {
   it("az On Hold projekt ügyét parkoltnak veszi", () => {
     expect(buildAttentionBoard(feed([task("a", { reason: MIGRATION + ",project_on_hold" })]), NOW).parked[0]?.next).toBe("amíg a projekt On Hold");
   });
+  it("a nyitott külső függőség parkolás, és nyers okkód nem jelenik meg", () => {
+    const row = buildAttentionBoard(feed([task("a", { reason: MIGRATION + ",project_on_hold,external_dependency_unresolved" }), task("b", { story: "IT-2", reason: MIGRATION + ",external_dependency_unresolved" })]), NOW).parked;
+    expect(row.map(item => item.next)).toEqual(["amíg a projekt On Hold", "amíg a külső függőség nyitott"]);
+    expect(row.map(item => item.meta).join(" ")).not.toMatch(/_/);
+  });
   it("a későbbre tett ügyet parkoltnak veszi, dátummal", () => {
     const board = buildAttentionBoard(feed([task("a", { snoozed_until: "2026-11-02T10:00:00.000Z" })]), NOW);
     expect(board.parked[0]?.next).toStartWith("Későbbre téve:");
