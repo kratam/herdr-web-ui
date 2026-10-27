@@ -21,6 +21,34 @@ export interface GgDecision {
   proposal: string | null;
   url: string | null;
 }
+/** A core v3 felmérés felületi vetülete; a brief, a checkpoint és a nyers bizonyíték nem jön át. */
+export interface GgAssessmentContextSection { label: string; items: string[] }
+export interface GgAssessment {
+  // előkészítési osztály (clarification, prepared, completion_candidate…); döntés felmérésénél null
+  preparation: string | null;
+  freshness: "current" | "stale";
+  assessed_at: string | null;
+  risk: { score: number; explanation: string } | null;
+  summary: string;
+  recommendation: string;
+  rationale: string;
+  missing_information: string[];
+  // opcionális bővítések a döntési kártyához (3. fázistól)
+  goal?: string;
+  situation?: string;
+  question?: string;
+  after_yes?: string;
+  if_no?: string;
+  context?: GgAssessmentContextSection[];
+}
+export interface GgAssessmentFeed {
+  tasks: Record<string, GgAssessment>;
+  decisions: Record<string, GgAssessment>;
+  /** story-azonosító → story-cím */
+  stories: Record<string, string>;
+  observed_at: string | null;
+  error: string | null;
+}
 export interface GgRepository { repository: string; label: string; path: string | null }
 export interface GgOverview {
   /** A nyitott helyi cwd-k mért git-common-dir szerinti fő checkoutja. */
@@ -28,5 +56,6 @@ export interface GgOverview {
   tasks: GgTask[];
   decisions: GgDecision[];
   repositories: GgRepository[];
+  assessments?: GgAssessmentFeed;
   source: { observed_at: string | null; error: string | null };
 }
