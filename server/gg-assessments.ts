@@ -61,12 +61,15 @@ export function projectAssessments(pages: { tasks: unknown[]; decisions: unknown
 
 async function readAll(call: GgToolCall, name: string, args: Record<string, unknown>): Promise<unknown[]> {
   const items: unknown[] = [];
-  for (let offset = 0; ; offset += PAGE) {
-    const page = record(await call(name, { ...args, limit: PAGE, offset }));
+  // a ténylegesen kapott elemszámmal lépünk, így a rövid oldal után sem ugrunk át elemet
+  for (;;) {
+    const page = record(await call(name, { ...args, limit: PAGE, offset: items.length }));
     if (!Array.isArray(page.items) || !Number.isInteger(page.total)) throw Error("invalid_assessments");
     if (Number(page.total) > MAX_ITEMS) throw Error("assessments_too_large");
     items.push(...page.items);
-    if (offset + page.items.length >= Number(page.total) || page.items.length === 0) return items;
+    if (items.length >= Number(page.total)) return items;
+    // a teljes szám előtti üres oldal hiányos forrás: hiba, nem csendes csonkolás
+    if (page.items.length === 0) throw Error("assessments_incomplete");
   }
 }
 

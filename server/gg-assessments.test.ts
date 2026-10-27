@@ -86,6 +86,11 @@ describe("GG felmérés-olvasó", () => {
     expect(Object.keys(feed.tasks)).toEqual(["t0"]);
     expect(feed.error).not.toBeNull();
   });
+  it("a teljes szám előtti üres oldalt hibának veszi, nem csonkol csendben", async () => {
+    const call = async (name: string, args: Record<string, unknown>) => name === "autoagent_tasks" && args.offset === 0 ? { items: [taskItem("t0")], total: 5 } : { items: [], total: name === "autoagent_tasks" ? 5 : 0 };
+    const feed = await new GgAssessmentService({ call }).read();
+    expect(feed.error).not.toBeNull();
+  });
   it("5000 elem fölött nem csonkol csendben", async () => {
     const { call } = pages(5001);
     const feed = await new GgAssessmentService({ call }).read();

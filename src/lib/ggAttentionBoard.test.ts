@@ -72,6 +72,15 @@ describe("Áttekintés-besorolás", () => {
     expect(board.decisions[0]?.story).toBe("IT-1953");
     expect(board.running.map(row => row.story)).toEqual(["IT-1937"]);
   });
+  it("egy story több döntése a saját felmérését kapja, és a fejléc nem mutat közös kockázatot", () => {
+    const decision = (id: string, task: string) => ({ id, task_id: task, text: "Kérdés " + id, proposal: null, url: null, risk: null, story: "IT-5" });
+    const own = (summary: string, score: number) => prepared({ preparation: null, summary, risk: { score, explanation: summary } });
+    const board = buildAttentionBoard(feed([task("w1", { state: "waiting", story: "IT-5" }), task("w2", { state: "waiting", story: "IT-5" })],
+      { decisions: [decision("d1", "w1"), decision("d2", "w2")], assessments: { tasks: {}, decisions: { d1: own("első", 4), d2: own("második", 2) }, stories: {}, observed_at: null, error: null } }), NOW);
+    expect(board.decisions).toHaveLength(1);
+    expect(board.decisions[0]?.assessments).toEqual({ d1: own("első", 4), d2: own("második", 2) });
+    expect(board.decisions[0]?.risk).toBeNull();
+  });
   it("prioritás szerint rendez, a 0 és a later hátra kerül", () => {
     const board = buildAttentionBoard(feed([task("x", { story: "IT-9", priority: 0 }), task("y", { story: "IT-8", priority: 2, reason: MIGRATION + ",later" }), task("z", { story: "IT-7", priority: 2 }), task("w", { story: "IT-6", priority: 1 })]), NOW);
     expect(board.soon.map(row => row.story)).toEqual(["IT-6", "IT-7", "IT-8", "IT-9"]);

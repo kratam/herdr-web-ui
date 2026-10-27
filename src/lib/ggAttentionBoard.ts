@@ -2,7 +2,8 @@ import type { GgAssessment, GgDecision, GgOverview, GgTask } from "../../shared/
 import { isGgSnoozed } from "./ggTaskAttention.ts";
 
 export interface StoryRow { story: string | null; title: string; tasks: GgTask[]; next: string; meta: string; assessment: GgAssessment | null; age_days: number | null }
-export interface DecisionPackage { story: string | null; title: string; decisions: GgDecision[]; tasks: GgTask[]; assessment: GgAssessment | null }
+// döntésenkénti felmérés (decision_id → felmérés); a fejléc kockázata csak egyetlen döntésnél egyértelmű
+export interface DecisionPackage { story: string | null; title: string; decisions: GgDecision[]; tasks: GgTask[]; assessments: Record<string, GgAssessment>; risk: { score: number; explanation: string } | null }
 export interface AttentionBoard { decisions: DecisionPackage[]; soon: StoryRow[]; parked: StoryRow[]; cleanup: StoryRow[]; running: StoryRow[] }
 
 // a migrációs import minden régi taskon ott van; önmagában nem mond semmit, nem mutatjuk
@@ -55,8 +56,11 @@ export function buildAttentionBoard(feed: GgOverview, now: number): AttentionBoa
   const decisions: DecisionPackage[] = [...decisionGroups.values()].map(list => {
     const tasks = feed.tasks.filter(task => list.some(decision => decision.task_id === task.id));
     const story = list[0]!.story ?? tasks[0]?.story ?? null;
-    const assessment = list.map(decision => feed.assessments?.decisions[decision.id]).find(value => value?.freshness === "current") ?? null;
-    return { story, title: (story ? stories[story] : undefined) ?? tasks[0]?.title ?? list[0]!.text, decisions: list, tasks, assessment };
+    const assessments: Record<string, GgAssessment> = {};
+    for (const decision of list) { const value = feed.assessments?.decisions[decision.id]; if (value?.freshness === "current") assessments[decision.id] = value; }
+    const only = list.length === 1 ? list[0]! : null;
+    const risk = only ? only.risk ?? assessments[only.id]?.risk ?? null : null;
+    return { story, title: (story ? stories[story] : undefined) ?? tasks[0]?.title ?? list[0]!.text, decisions: list, tasks, assessments, risk };
   });
 
   const running = byStory(feed.tasks.filter(task => task.state !== "planned" && RUNNING_LABELS[task.state] && !decisionTasks.has(task.id))).map(tasks => {

@@ -36,14 +36,14 @@ interface Props {
 
 /** Egy story döntései egy kártyán: előbb a tartalom (helyzet, kérdés, javaslat, kockázat), utána a válasz. */
 export function GgDecisionPackage({ pack, unavailable, connection, openPane, saved }: Props) {
-  const risk = pack.decisions.map(decision => decision.risk).find(value => value) ?? pack.assessment?.risk ?? null;
+  const risk = pack.risk;
   const taskCount = pack.tasks.length;
   return <article className="gg-package" aria-label={(pack.story ?? "Döntés") + " · " + pack.title}>
     <header className="gg-package-head">
       <div><small>{pack.story ?? "Ismeretlen story"}{taskCount > 1 ? " · " + taskCount + " task" : ""}</small><h3>{pack.title}</h3></div>
       {risk && <span className={"gg-risk gg-risk--" + (risk.score >= 4 ? "low" : risk.score === 3 ? "mid" : "high")}>{riskMark(risk.score)} {risk.score}</span>}
     </header>
-    {pack.decisions.map(decision => <DecisionBody key={decision.id} decision={decision} story={pack.story} assessment={pack.assessment} unavailable={unavailable} connection={connection} openPane={openPane} saved={saved} />)}
+    {pack.decisions.map(decision => <DecisionBody key={decision.id} decision={decision} story={pack.story} assessment={pack.assessments[decision.id] ?? null} unavailable={unavailable} connection={connection} openPane={openPane} saved={saved} />)}
   </article>;
 }
 
