@@ -53,6 +53,29 @@ mögött vannak; watch/bridge hozzáférésből egyik sem használható. A rövi
 MCP-kapcsolat az autentikált `gg-mcp-proxy` identitását használja és mindig lezárul.
 Nincs új periodikus lekérdezés vagy daemon.
 
+## Döntési csomagok és teendő szerinti csoportok (2026-10-27)
+
+A globális és a workspace-nézet teendő szerint tagol (`src/lib/ggAttentionBoard.ts`):
+
+- **Tőlem döntés kell:** storynként egy kártya a nyitott pending döntésekből. A kérdés,
+  a javaslat és a kockázat (`proposal_risk`) a válaszgombok előtt látszik; ha van friss
+  core-felmérés, a „Bővebb háttér” lenyitva a célt, az indokot, a hiányzó információt
+  és a felmérés `context` szakaszait mutatja. Az „Elfogadom a javaslatot” csak kitölti
+  a választ (igen-nem kérdésnél „Igen”); a rögzítés külön kattintás a meglévő kötött úton.
+- **Hamarosan hozzád kerül:** a többi planned ügy storynként, „még nincs előkészítve” /
+  „előkészítve: dátum” / „elavult előkészítés” jelöléssel; a `later` a sor végére kerül.
+- **Most nincs vele teendőd:** Parkolt (`after_*`, `project_on_hold`, nyitott külső
+  függőség, személyes későbbre tétel), Rendezendő (a felmérés kész/duplikált/elavult
+  jelöltnek tartja), Folyamatban vagy elakadt.
+- A teljes munkalista (prioritás, későbbre tétel) a globális nézetben a csukott
+  „Minden munka” blokkban maradt.
+
+A felméréseket és a story-címeket a szerver a meglévő személyes `gg-mcp-proxy` úton
+olvassa (`autoagent_tasks`, `autoagent_decisions`, `autoagent_work_packages`, v3),
+öt percenként, sorban, egyszerre egy olvasással (`server/gg-assessments.ts`). A
+feladatsor nem várja meg; a hibája egy mondatban látszik, a feladatsor ettől még
+működik. A runner DB-szerepkör jogát nem bővítettük.
+
 ## Áttekintő olvasó
 
 `GET /api/gg/overview`: a meglévő Ovis-hitelesítés mögött, csak interaktív helyi
