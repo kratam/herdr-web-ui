@@ -23,7 +23,7 @@ def main():
             tasks = [{key: task.get(key) for key in fields} for task in store.tasks() if task.get("package_state") == "active"]
             # A CLI status csak az utolsó 100 (válaszolt és függő) kérdést adja. Itt az összes
             # aktív csomag nyitott kérdése kell; a túl nagy adathalmaz látható hiba, nem csonkolás.
-            questions = store.all("SELECT d.id,d.question_key,d.task_id,d.state,d.text,d.proposal,d.question_url "
+            questions = store.all("SELECT d.id,d.question_key,d.task_id,d.state,d.text,d.proposal,d.proposal_risk,d.question_url "
                                   "FROM agent_core_decision d JOIN agent_core_package w ON w.id=d.package_id "
                                   "WHERE d.state='pending' AND w.state='active' ORDER BY d.created_at LIMIT 5001")
             if len(questions) > 5000 or len(tasks) > 10000:

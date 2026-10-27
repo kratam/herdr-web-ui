@@ -20,6 +20,10 @@ export interface GgDecision {
   text: string;
   proposal: string | null;
   url: string | null;
+  /** a forrás proposal_risk mezője; hibás vagy hiányzó érték esetén null */
+  risk?: { score: number; explanation: string } | null;
+  /** a döntés taskjának storyja */
+  story?: string | null;
 }
 /** A core v3 felmérés felületi vetülete; a brief, a checkpoint és a nyers bizonyíték nem jön át. */
 export interface GgAssessmentContextSection { label: string; items: string[] }
