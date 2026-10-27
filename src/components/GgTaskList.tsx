@@ -2,10 +2,12 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { GgTask } from "../../shared/gg-overview.ts";
 import type { GgOverviewFeed } from "../lib/ggOverviewFeed.ts";
 import { GG_PRIORITIES, isGgSnoozed, selectGgTasks, type GgTaskFilter } from "../lib/ggTaskAttention.ts";
+import { reasonLabels } from "../lib/ggAttentionBoard.ts";
 
 /** Ugyanaz a story-szintű prioritás és személyes átnézés a globális és workspace-nézetben. */
 export function GgTaskList({ tasks, cache, disabled, chip, actions }: { tasks: GgTask[]; cache: GgOverviewFeed; disabled: boolean; chip(state: string): ReactNode; actions?: (task: GgTask) => ReactNode }) {
   const [filter, setFilter] = useState<GgTaskFilter>("now");
+  const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"priority" | "updated">("priority");
   const [now, setNow] = useState(Date.now);
   const [busy, setBusy] = useState<string | null>(null);
@@ -38,14 +40,14 @@ export function GgTaskList({ tasks, cache, disabled, chip, actions }: { tasks: G
     const until = value === "clear" ? null : new Date(Date.now() + Number(value) * 86400_000).toISOString();
     void change(task, { action: "snooze", snoozed_until: until });
   };
-  const visible = selectGgTasks(tasks, filter, sort, now);
+  const visible = selectGgTasks(tasks, filter, sort, now, query);
   const filters: [GgTaskFilter, string][] = [["now", "Most"], ["unranked", "Besorolandó"], ["review", "Ellenőrizendő prioritás"], ["snoozed", "Későbbre tett"], ["all", "Összes"]];
   return <div className="gg-work-list">
-    <div className="gg-work-toolbar"><label>Nézet<select aria-label="Munkák szűrése" value={filter} onChange={event => setFilter(event.target.value as GgTaskFilter)}>{filters.map(([value, label]) => <option key={value} value={value}>{label} ({selectGgTasks(tasks, value, sort, now).length})</option>)}</select></label><label>Rendezés<select aria-label="Munkák rendezése" value={sort} onChange={event => setSort(event.target.value as "priority" | "updated")}><option value="priority">Linear-prioritás</option><option value="updated">Legutóbb módosított</option></select></label></div>
+    <div className="gg-work-toolbar"><label>Keresés<input type="search" aria-label="Munkák keresése" placeholder="IT-szám vagy cím" value={query} onChange={event => setQuery(event.target.value)} /></label><label>Nézet<select aria-label="Munkák szűrése" value={filter} onChange={event => setFilter(event.target.value as GgTaskFilter)}>{filters.map(([value, label]) => <option key={value} value={value}>{label} ({selectGgTasks(tasks, value, sort, now, query).length})</option>)}</select></label><label>Rendezés<select aria-label="Munkák rendezése" value={sort} onChange={event => setSort(event.target.value as "priority" | "updated")}><option value="priority">Linear-prioritás</option><option value="updated">Legutóbb módosított</option></select></label></div>
     <p className="gg-section-hint">A prioritás a Linear-story összes munkájára érvényes. A későbbre tétel a story összes tervezett munkáját rejti az átnézésből; az agentek futását nem állítja meg.</p>
     {notice && <p className="gg-overview-warning" role="alert">{notice}</p>}
     {visible.map(task => <div className="gg-overview-item gg-task" key={task.id} aria-busy={busy === task.id || undefined}>
-      <div className="gg-task-content"><div className="gg-task-heading">{task.url ? <a href={task.url} target="_blank" rel="noreferrer">{task.title}</a> : <span>{task.title}</span>}{chip(task.state)}</div><small>{task.story}{task.reason ? " · " + task.reason : ""}{task.repositories.length ? " · " + task.repositories.map(repo => repo.split("/").at(-1)).join(", ") : ""}</small>
+      <div className="gg-task-content"><div className="gg-task-heading">{task.url ? <a href={task.url} target="_blank" rel="noreferrer">{task.title}</a> : <span>{task.title}</span>}{chip(task.state)}</div><small>{task.story}{reasonLabels(task.reason).length ? " · " + reasonLabels(task.reason).join(", ") : ""}{task.repositories.length ? " · " + task.repositories.map(repo => repo.split("/").at(-1)).join(", ") : ""}</small>
         {task.priority_needs_review && <small className="gg-priority-review">Ellenőrizendő prioritás · korábbi agentírás, az emberi szándék nem igazolt</small>}
         {task.priority_sync_pending && <small>Linear mentve · a core-tükör frissítésére vár</small>}
         {isGgSnoozed(task, now) && <small>Későbbre téve: {new Date(task.snoozed_until!).toLocaleString("hu-HU")}</small>}

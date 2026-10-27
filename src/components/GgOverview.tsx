@@ -14,6 +14,8 @@ import type { AppActions } from "../lib/actions.ts";
 import type { GgOverview } from "../lib/useGgOverview.ts";
 import { GgTaskList } from "./GgTaskList.tsx";
 import { GgDecisions } from "./GgDecisions.tsx";
+import { GgAttentionGroups } from "./GgAttentionGroups.tsx";
+import { buildAttentionBoard } from "../lib/ggAttentionBoard.ts";
 import "./GgOverview.css";
 
 export interface GgOverviewTarget { machineId: string; workspaceId: string | null }
@@ -62,6 +64,11 @@ export function GgOverviewPanel({ target, cache, machines, onWorkspace, onPane, 
   })), [machines]);
   const groups = useMemo(() => buildGgGroups(feed, live), [feed, live]);
   const selected = target.workspaceId === null ? null : groups.find(group => group.machineId === target.machineId && group.workspaceId === target.workspaceId);
+  // globálisan a teljes feed, workspace-nézetben csak a workspace taskjai és döntései
+  const board = useMemo(() => {
+    const base = feed ?? { tasks: [], decisions: [], repositories: [], source: { observed_at: null, error: null } };
+    return buildAttentionBoard(selected ? { ...base, tasks: selected.tasks, decisions: selected.decisions } : base, Date.now());
+  }, [feed, selected]);
   const sourceError = loadError ?? feed?.source.error ?? null;
   const known = hasKnownGgData(feed);
   const unavailable = sourceError !== null;
@@ -120,7 +127,9 @@ export function GgOverviewPanel({ target, cache, machines, onWorkspace, onPane, 
     {launchNotice && <p className="gg-overview-warning" role="status">{launchNotice.text}{launchNotice.paneId && <button className="gg-overview-link" onClick={() => onAgentPane("local", launchNotice.paneId!, false)}>Tab megnyitása</button>}</p>}
     {feed?.source.observed_at && <p className="gg-section-hint">Feladatsor lekérdezve: {new Date(feed.source.observed_at).toLocaleString("hu-HU")}{unavailable ? " · utolsó ismert adat" : ""}</p>}
     {!workspaceMode ? <>
-      <GgDecisions decisions={feed?.decisions ?? []} tasks={feed?.tasks ?? []} unavailable={unavailable || !known || !localOnline} refresh={() => cache.refresh(true)} openPane={(id, started) => onAgentPane("local", id, started)} />
+      <GgDecisions packages={board.decisions} unavailable={unavailable || !known || !localOnline} refresh={() => cache.refresh(true)} openPane={(id, started) => onAgentPane("local", id, started)} />
+      {feed?.assessments?.error && <p className="gg-overview-warning" role="status">{feed.assessments.error}</p>}
+      <GgAttentionGroups board={board} />
       <details className="gg-runtime-summary"><summary>Futó sessionök és workspace-ek · {groups.reduce((total, group) => total + group.agents.length, 0)} agent</summary>
       <div className="gg-overview-table"><table><thead><tr><th>Workspace / repository</th><th>Döntések</th><th>Munkák</th><th>Hibák</th></tr></thead><tbody>{groups.map(group => <tr key={group.key}>
         <td><a href="#gg-workspace" aria-busy={opening === group.key || undefined} onClick={event => { event.preventDefault(); void open(group); }}>{group.label}</a><small>{group.workspaceId === null ? "Nincs nyitott workspace" : group.online ? "Nyitott" : "Nem élő kapcsolat"}{group.machineId !== "local" ? " · " + (machines.find(machine => machine.id === group.machineId)?.name ?? group.machineId) : ""}</small></td>
@@ -128,11 +137,12 @@ export function GgOverviewPanel({ target, cache, machines, onWorkspace, onPane, 
         <td>{counts(group).tasks}{unavailable && group.machineId === "local" && known ? "*" : ""}<small>{group.agents.length} élő agent{!group.online && group.workspaceId !== null ? " · régi állapot" : ""}</small></td>
         <td>{known || group.errors.length ? group.errors.length : "—"}{unavailable && known ? "*" : ""}</td>
       </tr>)}</tbody></table></div></details>
-      {feed && <section className="gg-overview-section"><h2>Minden munka <span className="gg-section-count">{feed.tasks.length}</span></h2><GgTaskList tasks={feed.tasks} cache={cache} disabled={unavailable} chip={chip} /></section>}
+      {feed && <details className="gg-group gg-all-work"><summary><span className="gg-group-name">Minden munka <span className="gg-section-count">{feed.tasks.length}</span></span><small>prioritás és későbbre tétel</small></summary><GgTaskList tasks={feed.tasks} cache={cache} disabled={unavailable} chip={chip} /></details>}
       {groups.length === 0 && <p className="gg-overview-empty">Nincs ismert workspace vagy tartós feladat.</p>}
     </> : selected ? <>
       {!selected.online && <p className="gg-overview-warning" role="status">A workspace kapcsolata nem élő; a pane-ek utolsó ismert állapotát látod.</p>}
-      <GgDecisions decisions={selected.decisions} tasks={selected.tasks} unavailable={unavailable || !known || selected.machineId !== "local" || !localOnline} refresh={() => cache.refresh(true)} openPane={(id, started) => onAgentPane("local", id, started)} />
+      <GgDecisions packages={board.decisions} unavailable={unavailable || !known || selected.machineId !== "local" || !localOnline} refresh={() => cache.refresh(true)} openPane={(id, started) => onAgentPane("local", id, started)} />
+      <GgAttentionGroups board={board} />
       <section className="gg-overview-section"><h2>Munkák <span className="gg-section-count">{selected.tasks.length + selected.agents.length}</span></h2>
         {selected.tasks.some(task => task.url) && selected.machineId === "local" && <p className="gg-section-hint">A Codex / Claude gomb másolja az issue linkjét, és új agenttabot nyit. Beillesztés után hozzáírhatod az utasításodat.</p>}
         <GgTaskList tasks={selected.tasks} cache={cache} disabled={unavailable} chip={chip} actions={task => task.url && selected.machineId === "local" && <div className="gg-task-actions" role="group" aria-label={task.title + " megnyitása"}>{(["codex", "claude"] as const).map(kind => <button type="button" className="btn btn-ghost" key={kind} aria-label={(kind === "codex" ? "Codex" : "Claude") + " · " + task.title} disabled={opening !== null || !selected.online || !agents.includes(kind)} title={!selected.online ? "A workspace nem érhető el." : !agents.includes(kind) ? "Az agent nem érhető el ezen a gépen." : "Issue-link másolása és új " + (kind === "codex" ? "Codex" : "Claude") + " tab"} onClick={() => void launchIssue(task, kind)}><Terminal aria-hidden="true" />{kind === "codex" ? "Codex" : "Claude"}<ArrowUpRight aria-hidden="true" /></button>)}</div>} />

@@ -24,6 +24,12 @@ describe("GG áttekintő adatprojekció", () => {
     const result = projectCoreStatus({ version: 3, items: [task], questions: [{ question_key: "q", task_id: "t1", state: "pending", text: "Kérdés", proposal: { value: true, label: "Javasolt irány", rationale: "Egyszerűbb működés" } }] });
     expect(result.decisions[0]?.proposal).toBe("Javasolt irány\n\nEgyszerűbb működés");
   });
+  it("a döntés kockázatát és storyját továbbadja, hibás kockázatot nem", () => {
+    const question = { question_key: "q", task_id: "t1", state: "pending", text: "Kérdés" };
+    const result = projectCoreStatus({ version: 3, items: [task], questions: [{ ...question, proposal_risk: { score: 3, explanation: "Közepes" } }, { ...question, question_key: "q2", proposal_risk: { score: 9 } }, { ...question, question_key: "q3" }] });
+    expect(result.decisions.map(decision => decision.risk)).toEqual([{ score: 3, explanation: "Közepes" }, null, null]);
+    expect(result.decisions[0]?.story).toBe("IT-1");
+  });
   it("aktív csomag lezárt taskjához tartozó nyitott kérdést sem tüntet el", () => {
     const result = projectCoreStatus({ version: 3, items: [{ ...task, state: "succeeded" }], questions: [{ question_key: "q", task_id: "t1", state: "pending", text: "Még nyitott" }] });
     expect(result.decisions).toHaveLength(1); expect(result.tasks).toHaveLength(1);
@@ -53,5 +59,22 @@ describe("GG státuszolvasás", () => {
     expect(stale.tasks).toHaveLength(1); expect(stale.source.error).not.toBeNull();
     expect(stale.source.observed_at).toBe(a.source.observed_at);
     expect(JSON.stringify(stale)).not.toContain("secret raw error");
+  });
+  it("a felméréseket a feedhez fűzi, a hibájuk nem rontja el a feladatsort", async () => {
+    const feed = { tasks: { t1: { preparation: "prepared", freshness: "current" as const, assessed_at: null, risk: null, summary: "S", recommendation: "R", rationale: "I", missing_information: [] } }, decisions: {}, stories: {}, observed_at: "2026-10-27T00:00:00.000Z", error: null };
+    const ok = new GgOverviewService({ load: async () => ({ version: 3, items: [task], questions: [] }), mappings: () => ({}), assessments: async () => feed });
+    await ok.read(); await new Promise(resolve => setTimeout(resolve, 0));
+    expect((await ok.read()).assessments?.tasks.t1?.summary).toBe("S");
+    const failing = new GgOverviewService({ load: async () => ({ version: 3, items: [task], questions: [] }), mappings: () => ({}), assessments: async () => { throw Error("down"); } });
+    await failing.read(); await new Promise(resolve => setTimeout(resolve, 0));
+    const result = await failing.read();
+    expect(result.tasks).toHaveLength(1); expect(result.source.error).toBeNull();
+    expect(result.assessments?.error).not.toBeNull();
+  });
+  it("a lassú felmérésolvasás nem tartja vissza a feladatsort", async () => {
+    const service = new GgOverviewService({ load: async () => ({ version: 3, items: [task], questions: [] }), mappings: () => ({}), assessments: () => new Promise(() => {}) });
+    const result = await service.read();
+    expect(result.tasks).toHaveLength(1);
+    expect(result.assessments).toBeUndefined();
   });
 });
