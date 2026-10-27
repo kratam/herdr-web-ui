@@ -4,24 +4,28 @@ import { isGgSnoozed } from "./ggTaskAttention.ts";
 export interface StoryRow { story: string | null; title: string; tasks: GgTask[]; next: string; meta: string; assessment: GgAssessment | null; age_days: number | null }
 // döntésenkénti felmérés (decision_id → felmérés); a fejléc kockázata csak egyetlen döntésnél egyértelmű
 export interface DecisionPackage { story: string | null; title: string; decisions: GgDecision[]; tasks: GgTask[]; assessments: Record<string, GgAssessment>; risk: { score: number; explanation: string } | null }
-export interface AttentionBoard { decisions: DecisionPackage[]; soon: StoryRow[]; parked: StoryRow[]; cleanup: StoryRow[]; running: StoryRow[] }
+export interface AttentionBoard { decisions: DecisionPackage[]; stuck: StoryRow[]; soon: StoryRow[]; parked: StoryRow[]; cleanup: StoryRow[]; running: StoryRow[] }
 
 // a migrációs import minden régi taskon ott van; önmagában nem mond semmit, nem mutatjuk
 const MIGRATION = "migration_import_no_execution_approval";
 const CLEANUP = ["completion_candidate", "duplicate_candidate", "obsolete_candidate"];
-const RUNNING_LABELS: Record<string, string> = { ready: "indítható, sorra vár", running: "fut", waiting: "várakozik", review: "review folyamatban", failed: "hibás" };
+const RUNNING_LABELS: Record<string, string> = { ready: "indítható, sorra vár", running: "fut", waiting: "várakozik", review: "review folyamatban" };
+// a core blocked_reason kódjainak felületi címkéje
+const REASON_LABELS: Record<string, string> = { after_gg3_launch: "a GG3-indulás után", project_on_hold: "a projekt On Hold", external_dependency_unresolved: "nyitott külső függőség", later: "sor végén", decision_pending: "döntésre vár", source_parked: "a forrásban parkolva" };
 const DAY = 86_400_000;
 const reasons = (task: GgTask): string[] => (task.reason ?? "").split(",").map(reason => reason.trim()).filter(reason => reason && reason !== MIGRATION);
 const day = (iso: string) => new Date(iso).toLocaleDateString("hu-HU");
+/** Olvasható okok; az ismeretlen kódot jelölve megtartjuk, nem rejtjük el. */
+export const reasonLabels = (reason: string | null): string[] => (reason ?? "").split(",").map(code => code.trim()).filter(code => code && code !== MIGRATION).map(code => REASON_LABELS[code] ?? "egyéb ok: " + code);
 
 /** A forrásból jövő parkolás feloldási feltétele; nincs parkolás: null. A later nem parkolás. */
 function parkedBecause(task: GgTask, now: number): string | null {
   const list = reasons(task);
-  if (list.includes("after_gg3_launch")) return "a GG3-indulás után";
-  if (list.some(reason => reason.startsWith("after_"))) return "mérföldkő után";
-  if (list.includes("project_on_hold")) return "amíg a projekt On Hold";
-  if (list.includes("external_dependency_unresolved")) return "amíg a külső függőség nyitott";
-  if (isGgSnoozed(task, now)) return "Későbbre téve: " + day(task.snoozed_until!);
+  if (list.includes("after_gg3_launch")) return "Parkol, amíg: a GG3-indulás után";
+  if (list.some(reason => reason.startsWith("after_"))) return "Parkol, amíg: egy mérföldkő teljesül";
+  if (list.includes("project_on_hold")) return "Parkol, amíg: a projekt On Hold";
+  if (list.includes("external_dependency_unresolved")) return "Parkol, amíg: a külső függőség nyitott";
+  if (isGgSnoozed(task, now)) return "Későbbre téve eddig: " + day(task.snoozed_until!);
   return null;
 }
 
@@ -63,11 +67,14 @@ export function buildAttentionBoard(feed: GgOverview, now: number): AttentionBoa
     return { story, title: (story ? stories[story] : undefined) ?? tasks[0]?.title ?? list[0]!.text, decisions: list, tasks, assessments, risk };
   });
 
-  const running = byStory(feed.tasks.filter(task => task.state !== "planned" && RUNNING_LABELS[task.state] && !decisionTasks.has(task.id))).map(tasks => {
-    const failed = tasks.find(task => task.state === "failed");
-    const next = failed ? "hibás" + (reasons(failed).length ? ": " + reasons(failed).join(", ") : "") : RUNNING_LABELS[tasks[0]!.state]!;
-    return row(tasks, next, tasks.length > 1 ? tasks.length + " task" : "", null);
-  });
+  const rank = (tasks: GgTask[]) => Math.min(...tasks.map(task => task.priority || 5));
+  const running = byStory(feed.tasks.filter(task => RUNNING_LABELS[task.state] && !decisionTasks.has(task.id)))
+    .map(tasks => row(tasks, RUNNING_LABELS[tasks[0]!.state]!, tasks.length > 1 ? tasks.length + " task" : "", null));
+  // a hibás munka nem „nincs vele teendő”: külön sáv, sürgősség szerint
+  const stuck = byStory(feed.tasks.filter(task => task.state === "failed" && !decisionTasks.has(task.id))).map(tasks => {
+    const labels = reasonLabels(tasks[0]!.reason);
+    return row(tasks, labels.length ? "hibás: " + labels.join(", ") : "hibás, az ok nincs megadva", tasks.length > 1 ? tasks.length + " task" : "", null);
+  }).sort((a, b) => rank(a.tasks) - rank(b.tasks) || (a.story ?? "").localeCompare(b.story ?? ""));
 
   const planned = feed.tasks.filter(task => task.state === "planned" && !decisionTasks.has(task.id));
   const parked = byStory(planned.filter(task => parkedBecause(task, now) !== null)).map(tasks => row(tasks, parkedBecause(tasks[0]!, now)!, tasks.length > 1 ? tasks.length + " task" : "", null));
@@ -82,7 +89,6 @@ export function buildAttentionBoard(feed: GgOverview, now: number): AttentionBoa
     const meta = [state, tasks.length > 1 ? tasks.length + " task" : "", later ? "sor végén" : ""].filter(Boolean).join(" · ");
     return { ...row(tasks, "előkészítés döntésre", meta, assessment), later };
   });
-  const rank = (tasks: GgTask[]) => Math.min(...tasks.map(task => task.priority || 5));
   soon.sort((a, b) => rank(a.tasks) - rank(b.tasks) || Number(a.later) - Number(b.later) || (b.age_days ?? 0) - (a.age_days ?? 0) || (a.story ?? "").localeCompare(b.story ?? ""));
-  return { decisions, soon: soon.map(({ later: _later, ...rest }) => rest), parked, cleanup, running };
+  return { decisions, stuck, soon: soon.map(({ later: _later, ...rest }) => rest), parked, cleanup, running };
 }
