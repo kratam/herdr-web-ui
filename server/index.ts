@@ -7,6 +7,7 @@ import type { GgDiscussionService } from "./gg-discussion.ts";
 import { discussionRuntime } from "./gg-discussion-runtime.ts";
 import { GgOverviewService, liveRepositoryRoots } from "./gg-overview.ts";
 import { createCore, type SocketData } from "./core/index.ts";
+import { GgAssessmentService } from "./gg-assessments.ts";
 import { ClientConnectionLog } from "./client-connection-log.ts";
 import { RequestLog } from "./request-log.ts";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -242,7 +243,7 @@ export function createServer(
   usageLogin.onLoginEnded(() => usage.invalidate());
   const ggWork = options.ggWork ?? new GgWorkService(new GgAttentionStore(options.stateDir ?? defaultStateDir()));
   const ggLoads = new GgHostLoads(async id => { if (!machines) throw Error("no_machines"); return machines.ggHostLoad(id); });
-  const ggOverview = options.ggOverview ?? new GgOverviewService({ roots: liveRepositoryRoots });
+  const ggOverview = options.ggOverview ?? new GgOverviewService({ roots: liveRepositoryRoots, assessments: (() => { const service = new GgAssessmentService(); return () => service.read(); })() });
   const voice = options.voice ?? new VoiceService({ stateDir, env: process.env, fetch });
   /** a login named here is taken as it is: a tagged node has none of its own to read (OVIS_TAILSCALE_OWNER) */
   const namedOwner = options.tailscaleOwner !== undefined ? options.tailscaleOwner : process.env["OVIS_TAILSCALE_OWNER"]?.trim() || undefined;
