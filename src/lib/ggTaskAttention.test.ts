@@ -11,3 +11,9 @@ it("prioritásban a sürgős az első, besorolatlan a végén; a halasztott lej�
 it("a személyes halasztás nem rejti az időközben hibás vagy döntésre váró munkát", () => {
   expect(selectGgTasks([{ ...task, state: "failed", snoozed_until: new Date(9000).toISOString() }], "now", "priority", 1000)).toHaveLength(1);
 });
+it("a kereső az IT-számra és a címrészletre szűr, kis- és nagybetűtől függetlenül", () => {
+  const tasks = [{ ...task, id: "a", title: "NTAK kulcs", story: "IT-1716" }, { ...task, id: "b", title: "Naptár", story: "IT-1477" }];
+  expect(selectGgTasks(tasks, "all", "priority", 0, "it-1716").map(t => t.id)).toEqual(["a"]);
+  expect(selectGgTasks(tasks, "all", "priority", 0, "  naptÁr ").map(t => t.id)).toEqual(["b"]);
+  expect(selectGgTasks(tasks, "all", "priority", 0, "")).toHaveLength(2);
+});

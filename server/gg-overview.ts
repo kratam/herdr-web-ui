@@ -4,13 +4,14 @@ import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
-import type { GgDecision, GgOverview, GgRepository, GgTask } from "../shared/gg-overview.ts";
+import type { GgAssessmentFeed, GgDecision, GgOverview, GgRepository, GgTask } from "../shared/gg-overview.ts";
 import { jsonResponse } from "./http.ts";
 import { sessionSnapshot } from "./herdr/client.ts";
 
 const exec = promisify(execFile);
 const FRESH_MS = 60_000;
 const SOURCE_ERROR = "Az autoagent-adatok most nem olvashatók. Az élő Ovis-állapot ettől még látszik.";
+const ASSESSMENT_ERROR = "Az előkészítések most nem olvashatók. A feladatsor ettől még látszik.";
 const record = (value: unknown): Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const str = (value: unknown, max = 500): string | null => typeof value === "string" && value.trim() !== "" ? value.slice(0, max) : null;
 const repo = (value: unknown): string | null => typeof value === "string" && /^[\w.-]+\/[\w.-]+$/.test(value) ? value : null;
@@ -43,7 +44,10 @@ export function projectCoreStatus(value: unknown): Pick<GgOverview, "tasks" | "d
     if (!id || !taskId || !text) throw Error("invalid_decision");
     const proposal = record(item.proposal);
     const proposalText = [str(proposal.label, 4000), str(proposal.rationale, 8000)].filter(Boolean).join("\n\n") || str(item.proposal, 8000);
-    decisions.push({ id, task_id: taskId, text, proposal: proposalText, url: url(item.question_url) });
+    const risk = record(item.proposal_risk);
+    decisions.push({ id, task_id: taskId, text, proposal: proposalText, url: url(item.question_url),
+      risk: Number.isInteger(risk.score) && Number(risk.score) >= 1 && Number(risk.score) <= 5 ? { score: Number(risk.score), explanation: str(risk.explanation, 4000) ?? "" } : null,
+      story: tasks.find(task => task.id === taskId)?.story ?? null });
   }
   return { tasks, decisions };
 }
@@ -99,11 +103,22 @@ export class GgOverviewService {
   private cached: GgOverview = { tasks: [], decisions: [], repositories: [], source: { observed_at: null, error: SOURCE_ERROR } };
   private nextRead = 0;
   private inFlight: Promise<GgOverview> | null = null;
-  constructor(private readonly options: { now?: () => number; load?: () => Promise<unknown>; mappings?: () => Record<string, GgRepository>; roots?: () => Promise<Record<string, string>> } = {}) {}
+  // a felmérés külön, háttérben frissül; a feladatsor sosem várja meg
+  private assessments: GgAssessmentFeed | undefined;
+  private assessing = false;
+  constructor(private readonly options: { now?: () => number; load?: () => Promise<unknown>; mappings?: () => Record<string, GgRepository>; roots?: () => Promise<Record<string, string>>; assessments?: () => Promise<GgAssessmentFeed> } = {}) {}
+  private refreshAssessments(): void {
+    if (!this.options.assessments || this.assessing) return;
+    this.assessing = true;
+    this.options.assessments()
+      .then(feed => { this.assessments = feed; }, () => { this.assessments = { tasks: {}, decisions: {}, stories: {}, observed_at: null, ...this.assessments, error: ASSESSMENT_ERROR }; })
+      .finally(() => { this.assessing = false; this.cached = { ...this.cached, ...(this.assessments ? { assessments: this.assessments } : {}) }; });
+  }
   async invalidate(): Promise<void> { await this.inFlight; this.nextRead = 0; }
   read(): Promise<GgOverview> {
     const now = (this.options.now ?? Date.now)();
     if (this.inFlight) return this.inFlight;
+    this.refreshAssessments();
     if (now < this.nextRead) return Promise.resolve(this.cached);
     this.inFlight = (async () => {
       try {
@@ -111,7 +126,7 @@ export class GgOverviewService {
         const mappings = (this.options.mappings ?? repositoryMappings)();
         const repositories = [...new Set(data.tasks.flatMap(task => task.repositories))].map(name => mappings[name] ?? { repository: name, label: name.split("/").at(-1)!, path: null });
         const roots = this.options.roots ? await this.options.roots() : {};
-        this.cached = { ...data, repositories, roots, source: { observed_at: new Date((this.options.now ?? Date.now)()).toISOString(), error: null } };
+        this.cached = { ...data, repositories, roots, ...(this.assessments ? { assessments: this.assessments } : {}), source: { observed_at: new Date((this.options.now ?? Date.now)()).toISOString(), error: null } };
       } catch { this.cached = { ...this.cached, source: { ...this.cached.source, error: SOURCE_ERROR } }; }
       this.nextRead = (this.options.now ?? Date.now)() + FRESH_MS;
       return this.cached;

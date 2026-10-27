@@ -106,7 +106,7 @@ try {
   await page.getByRole("tab").nth(1).click();
   const readsBeforeReturn = feedReads;
   await page.getByRole("tab").first().click();
-  await page.getByText("Nyitott feladat", { exact: true }).waitFor();
+  await page.getByRole("link", { name: "Nyitott feladat", exact: true }).waitFor();
   assert.equal(feedReads, readsBeforeReturn, "fresh cache is reused on returning to overview");
   assert.equal(await page.getByText("A feladatsor betöltése…", { exact: false }).count(), 0);
   await page.evaluate(() => { (window as unknown as { ggCopyFails: boolean }).ggCopyFails = true; });
@@ -118,7 +118,7 @@ try {
     await page.getByRole("button", { name: kind + " · Nyitott feladat", exact: true }).click();
     await page.getByRole("heading", { name: prefix, exact: true }).waitFor({ state: "hidden" });
     await page.getByRole("tab").first().click();
-    await page.getByText("Nyitott feladat", { exact: true }).waitFor();
+    await page.getByRole("link", { name: "Nyitott feladat", exact: true }).waitFor();
   }
   assert.equal(requests.length, 2);
   // A split-próba az eredeti natív tabbal fut tovább.
@@ -160,6 +160,8 @@ try {
   await page.getByRole("combobox", { name: "Munkák szűrése", exact: true }).selectOption("snoozed");
   await page.getByText("Tervezett munka", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Vissza a globális áttekintéshez" }).click();
+  // globálisan a teljes munkalista egy csukott blokkban van; a prioritás és a későbbre tétel ott marad
+  await page.locator(".gg-all-work > summary").click();
   await page.getByText("Tervezett munka", { exact: true }).waitFor({ state: "hidden" });
   await page.getByRole("combobox", { name: "Munkák szűrése", exact: true }).selectOption("snoozed");
   await page.getByText("Tervezett munka", { exact: true }).waitFor();
@@ -175,6 +177,7 @@ try {
   await page.goto(`http://127.0.0.1:${server.port}/?ggOverview=global`);
   await page.locator(".gg-runtime-summary > summary").click();
   await page.getByRole("link", { name: "gg-closed-fixture", exact: true }).waitFor();
+  await page.locator(".gg-all-work > summary").click();
   assert.equal(await page.getByRole("combobox", { name: "Prioritás · Tervezett munka", exact: true }).inputValue(), "3");
   await page.getByRole("link", { name: "gg-closed-fixture", exact: true }).click();
   await page.getByRole("heading", { name: "gg-closed-fixture", exact: true }).waitFor();

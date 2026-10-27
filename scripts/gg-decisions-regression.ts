@@ -46,8 +46,12 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const errors: string[] = []; page.on("pageerror", error => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.port}/?ggOverview=global`);
-  const card = (index: number) => page.getByRole("article", { name: `IT-${index} · ` + questions[index - 1]!.text, exact: true });
-  await card(1).getByRole("button", { name: "Válaszolok", exact: true }).click();
+  const card = (index: number) => page.getByRole("article", { name: `IT-${index} · Próba IT-${index}`, exact: true });
+  // a javaslat és a kockázat a válaszgombok előtt is látszik
+  for (const fragment of [questions[0]!.text, "Gyorsabb átnézés.", "Visszafordítható változtatás."]) await card(1).getByText(fragment, { exact: false }).first().waitFor();
+  await card(1).getByRole("button", { name: "Elfogadom a javaslatot", exact: true }).click();
+  assert.equal(await card(1).getByRole("textbox", { name: "Válaszod" }).inputValue(), "Igen", "az elfogadás kitölti, de nem küldi a választ");
+  assert.equal(writes.length, 0);
   await card(1).getByRole("textbox", { name: "Válaszod" }).fill("Talán");
   await card(1).getByRole("button", { name: "Válasz rögzítése" }).click();
   await card(1).getByText("A válasz megérkezett, de pontosítás kell", { exact: false }).waitFor();
@@ -55,7 +59,7 @@ try {
   await card(1).getByRole("button", { name: "Igen", exact: true }).click();
   await card(1).getByRole("button", { name: "Válasz rögzítése" }).click();
   await card(1).waitFor({ state: "detached" });
-  await card(2).getByRole("button", { name: "Válaszolok", exact: true }).click();
+  await card(2).getByRole("button", { name: "Mást mondok", exact: true }).click();
   await card(2).getByRole("textbox", { name: "Válaszod" }).fill("  Igen, így jó.  ");
   await card(2).getByRole("button", { name: "Válasz rögzítése" }).click();
   await card(2).getByRole("alert").waitFor();
@@ -69,7 +73,7 @@ try {
   assert.equal(writes[2]!.request_key, writes[3]!.request_key, "ugyanaz a válasz ugyanazt a mentést ellenőrzi");
   assert.notEqual(writes[0]!.request_key, writes[1]!.request_key, "az átfogalmazás új válasz");
   await page.setViewportSize({ width: 1440, height: 900 });
-  await card(3).getByRole("button", { name: "Válaszolok", exact: true }).click();
+  await card(3).getByRole("button", { name: "Mást mondok", exact: true }).click();
   await card(3).getByText("Mire vonatkozik a döntés?", { exact: true }).click();
   await card(3).getByText("A teljes művelet, paraméterek és feltételek", { exact: true }).click();
   const plan = await card(3).locator(".gg-decision-plan").innerText();
