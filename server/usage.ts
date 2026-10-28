@@ -985,7 +985,9 @@ export class UsageService {
     }
     if (id === "claude") {
       const home = this.ctx.env["CLAUDE_CONFIG_DIR"] || "";
-      return { source: home || "default", env: { CLAUDE_CONFIG_DIR: home } };
+      // Üres értéket nem adunk át: a Claude az üres CLAUDE_CONFIG_DIR-t a munkakönyvtárnak veszi,
+      // és ott se a belépést, se a keychain-bejegyzést nem találja.
+      return { source: home || "default", env: home ? { CLAUDE_CONFIG_DIR: home } : {} };
     }
     return null;
   }
