@@ -5,7 +5,7 @@
  * `tailscale serve` for this server's port on a free allowed HTTPS port, and `openTailscaleApp` opens the Tailscale
  * app so its owner can turn it on and sign in. Nothing runs `up`, and no serve config for another port is touched.
  */
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import type { RemoteAccess, TailscaleAccess } from "../shared/protocol.ts";
 import { addressesNode } from "./access.ts";
@@ -13,6 +13,7 @@ import { addressesNode } from "./access.ts";
 const TIMEOUT_MS = 2500;
 /** the macOS App Store build puts no `tailscale` on the PATH; its CLI lives in the app bundle */
 const MAC_APP_CLI = "/Applications/Tailscale.app/Contents/MacOS/Tailscale";
+const DAEMON_SOCKET = "/var/run/tailscaled.socket";
 export const HTTPS_PORTS: readonly number[] = [443, 8443, 7317, 17317];
 export const HTTPS_PORT_VARIABLE = "OVIS_TAILSCALE_HTTPS_PORT";
 const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
@@ -122,11 +123,28 @@ function readServe(output: TailscaleOutput | null, port: number, candidates: rea
 }
 
 export function tailscaleBinary(): string | null {
-  return Bun.which("tailscale") ?? (existsSync(MAC_APP_CLI) ? MAC_APP_CLI : null);
+  const standalone = existsSync(DAEMON_SOCKET);
+  for (const name of ["tailscale", "/usr/local/bin/tailscale", "/opt/homebrew/bin/tailscale"]) {
+    const binary = Bun.which(name);
+    if (binary !== null && (!standalone || !isMacAppCli(binary))) return binary;
+  }
+  // Az app CLI-je a kijelentkezett GUI-démont is elindíthatja; a másik démont ne fedje el.
+  return !standalone && existsSync(MAC_APP_CLI) ? MAC_APP_CLI : null;
+}
+
+function isMacAppCli(binary: string): boolean {
+  // A macOS CLI-integráció symlinkkel is mutathat az appra.
+  try { return realpathSync(binary).includes("/Tailscale.app/"); }
+  catch { return binary.includes("/Tailscale.app/"); }
+}
+
+/** A státuszolvasás és a plugin megosztása ugyanazt a démont használja. */
+export function tailscaleCommand(binary: string, args: string[]): [string, ...string[]] {
+  return [binary, ...(existsSync(DAEMON_SOCKET) && !isMacAppCli(binary) ? [`--socket=${DAEMON_SOCKET}`] : []), ...args];
 }
 
 async function run(binary: string, args: string[]): Promise<string | null> {
-  const proc = Bun.spawn([binary, ...args], { windowsHide: true, stdin: "ignore", stdout: "pipe", stderr: "ignore" });
+  const proc = Bun.spawn(tailscaleCommand(binary, args), { windowsHide: true, stdin: "ignore", stdout: "pipe", stderr: "ignore" });
   const timer = setTimeout(() => proc.kill(), TIMEOUT_MS);
   try {
     const [text, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
@@ -178,7 +196,7 @@ export async function serveTailscale(port: number, candidates: readonly number[]
   // a port is only taken when it is shown free: a serve status that could not be read changes nothing
   if (!before.known) return { ok: false, code: "tailscale_serve_refused", detail: "tailscale serve status could not be read" };
   if (before.free === null) return { ok: false, code: "tailscale_no_port" };
-  const proc = Bun.spawn([binary, "serve", "--bg", `--https=${before.free}`, `http://127.0.0.1:${port}`], { windowsHide: true, stdin: "ignore", stdout: "pipe", stderr: "pipe" });
+  const proc = Bun.spawn(tailscaleCommand(binary, ["serve", "--bg", `--https=${before.free}`, `http://127.0.0.1:${port}`]), { windowsHide: true, stdin: "ignore", stdout: "pipe", stderr: "pipe" });
   const timer = setTimeout(() => proc.kill(), SERVE_TIMEOUT_MS);
   let code: number;
   let said: string;

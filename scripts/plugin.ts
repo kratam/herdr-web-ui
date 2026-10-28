@@ -47,7 +47,7 @@ import { discardTyped } from "./libc.ts";
 import { desktopCommandRecord, ENV_FILES, LEGACY_PLUGIN_ID, ownDir, PLUGIN_ID, pluginConfigDir, readEnvFile } from "./plugin-settings.ts";
 import { accountServiceOrigin, DEFAULT_ACCOUNT_SERVICE } from "../server/static.ts";
 import { herdrStateDir } from "./plugin-state.ts";
-import { HTTPS_PORT_VARIABLE, HTTPS_PORTS, httpsPorts, parseTailscale, parseTailscaleIp, parseTailscaleOwner, readTailscale, tailscaleBinary } from "../server/tailscale.ts";
+import { HTTPS_PORT_VARIABLE, HTTPS_PORTS, httpsPorts, parseTailscale, parseTailscaleIp, parseTailscaleOwner, readTailscale, tailscaleBinary, tailscaleCommand } from "../server/tailscale.ts";
 import { descendantProcesses, windowsArgv, windowsProcessTable } from "../server/windows-processes.ts";
 
 // `ovis tui` comes first: the screen needs nothing of this install's state, so it starts before the work below reads the
@@ -1282,7 +1282,7 @@ async function phone(): Promise<number> {
     }
     say(`Publishing the app to your tailnet: ${access.serve_command}`);
     const [, ...args] = access.serve_command.split(" ");
-    const serve = Bun.spawn([binary, ...args.slice(0, 1), "--yes", ...args.slice(1)], { windowsHide: true, stdin: "ignore", stdout: "inherit", stderr: "inherit" });
+    const serve = Bun.spawn(tailscaleCommand(binary, [...args.slice(0, 1), "--yes", ...args.slice(1)]), { windowsHide: true, stdin: "ignore", stdout: "inherit", stderr: "inherit" });
     const timer = setTimeout(() => serve.kill(), SERVE_TIMEOUT_MS);
     const code = await serve.exited;
     clearTimeout(timer);
