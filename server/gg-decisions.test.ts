@@ -36,6 +36,17 @@ describe("GG canonical döntésválasz", () => {
       answer_text_sha256: hash("talán"), answer_processing: "ambiguous" }));
     expect((await service.reply({ binding, request_key: requestId, raw_text: "talán" })).answer_processing).toBe("ambiguous");
   });
+  it("megváltozott briefnél a megőrzött választ nyugtázza, nem hibaként", async () => {
+    const service = new GgDecisionService(async () => ({ operation: "session_reply", task_id: taskId, request_key: requestId, state: "preserved",
+      answer_preserved: true, valid_answer: false, reason: "github_brief_changed", decision_id: decisionId, response_id: requestId, delivery: "direct" }));
+    expect(await service.reply({ binding, request_key: requestId, raw_text: "Teljes képtámogatás kell." }))
+      .toEqual({ decision_id: decisionId, response_id: requestId, answer_processing: "preserved" });
+  });
+  it("más döntésre szóló megőrzés nem nyugta", async () => {
+    const service = new GgDecisionService(async () => ({ operation: "session_reply", state: "preserved", answer_preserved: true, valid_answer: false,
+      reason: "github_brief_changed", decision_id: taskId, response_id: requestId, delivery: "direct" }));
+    await expect(service.reply({ binding, request_key: requestId, raw_text: "x" })).rejects.toThrow("reply_unconfirmed");
+  });
   it("más döntés nyugtáját és üres választ nem állítja sikeres mentésnek", async () => {
     const service = new GgDecisionService(async () => ({ state: "recorded", decision_id: taskId, answer_processing: "answered" }));
     await expect(service.reply({ binding, request_key: requestId, raw_text: "igen" })).rejects.toThrow("reply_unconfirmed");

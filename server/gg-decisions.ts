@@ -99,6 +99,12 @@ export class GgDecisionService {
     if (!uuid(body.request_key) || typeof raw !== "string" || !raw.trim() || [...raw].length > 16000) throw Error("invalid_reply");
     const result = object(await this.call("autoagent_task_action", { action: { ...binding, operation: "session_reply", request_key: body.request_key,
       raw_text: raw, answer_text: raw, origin: { kind: "native_ui", message_ref: body.request_key } } }));
+    // megváltozott brief: a core megőrizte a választ (gg-agents #337, gg-mcp #277); nyugta, nem hiba
+    if (result.state === "preserved") {
+      if (result.operation !== "session_reply" || result.answer_preserved !== true || result.valid_answer !== false || result.delivery !== "direct"
+        || result.decision_id !== binding.decision_id || result.task_id !== binding.task_id || result.request_key !== body.request_key || !uuid(result.response_id)) throw Error("reply_unconfirmed");
+      return { decision_id: binding.decision_id, response_id: result.response_id, answer_processing: "preserved" };
+    }
     if (result.version !== 3 || result.operation !== "session_reply" || result.state !== "recorded" || result.delivery !== "direct"
       || result.decision_id !== binding.decision_id || result.task_id !== binding.task_id || result.request_key !== body.request_key
       || !uuid(result.response_id) || result.raw_text_sha256 !== hash(raw) || result.answer_text_sha256 !== hash(raw)

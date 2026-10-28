@@ -3,7 +3,8 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { homedir } from "node:os";
 
 export type GgToolCall = (name: string, args: Record<string, unknown>) => Promise<unknown>;
-const TOOLS = new Set(["autoagent_decisions", "autoagent_task_action", "autoagent_tasks", "autoagent_work_packages"]);
+// az autoagent_intake csak olvas: a gg-mb óránkénti forrás-ellenőrzése (2. fázis)
+const TOOLS = new Set(["autoagent_decisions", "autoagent_intake", "autoagent_task_action", "autoagent_tasks", "autoagent_work_packages"]);
 const KNOWN_ERRORS = ["stale_target", "target_state_mismatch", "review_head_mismatch", "plan_mismatch", "owner_mismatch", "idempotency_conflict", "capability_missing", "plan_expired"];
 
 /** A meglévő személyes proxy kezeli az identitást; a rövid kapcsolat végén a child is kilép. */

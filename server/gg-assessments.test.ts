@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { GgAssessmentService, projectAssessments } from "./gg-assessments.ts";
+import { GgAssessmentService, projectAssessments, projectSourceChecks } from "./gg-assessments.ts";
 
 const attention = { kind: "preparation", effort: "short", minutes_min: 5, minutes_max: 10, materials: ["text"], confidence: "estimated",
   risk: { score: 4, explanation: "Alacsony" }, summary: "Helyzet", recommendation: "Javaslat", rationale: "Indok", missing_information: ["Mi hiányzik?"] };
@@ -95,5 +95,28 @@ describe("GG felmérés-olvasó", () => {
     const { call } = pages(5001);
     const feed = await new GgAssessmentService({ call }).read();
     expect(feed.error).not.toBeNull();
+  });
+});
+
+describe("GG forrás-ellenőrzés (intake)", () => {
+  const intake = (items: unknown[], extra: Record<string, unknown> = {}) => ({ healthy: true, age_hours: 0.2, items, total: items.length, ...extra });
+  it("a brief-változást taskonként, a parkolást storynként adja, blokkolónévvel", () => {
+    const result = projectSourceChecks(intake([
+      { kind: "core_brief_changed", task_id: "t1", story_identifier: "IT-1", github_updated_at: "2026-10-26T15:18:24Z", github_revision: "x".repeat(64), body: "PRIVATE" },
+      { kind: "core_source_parked", story_identifier: "IT-2", reason: "blocked_by:IT-9", blockers: [{ identifier: "IT-9", title: "Előfeltétel" }] },
+      { kind: "linear_unregistered", story_identifier: "IT-3" },
+    ]));
+    expect(result).toEqual({ brief_changed: { t1: { changed_at: "2026-10-26T15:18:24Z" } },
+      parked: { "IT-2": { reason: "blocked_by:IT-9", blockers: [{ identifier: "IT-9", title: "Előfeltétel" }] } } });
+  });
+  it("elavult vagy hibás intake-et nem használ", () => {
+    expect(projectSourceChecks(intake([{ kind: "core_brief_changed", task_id: "t1" }], { healthy: false }))).toBeNull();
+    expect(projectSourceChecks({ items: "x" })).toBeNull();
+  });
+  it("a döntés megőrzött (stale) válaszát átadja, a többit nem", () => {
+    const decision = { ...taskItem("d1"), responses: [
+      { outcome: "stale", raw_owner_text: "Teljes képtámogatás kell.", source_created_at: "2026-10-28T08:20:00Z" },
+      { outcome: "ambiguous", raw_owner_text: "talán" }] };
+    expect(projectAssessments({ tasks: [], decisions: [decision], packages: [] }).preserved).toEqual({ d1: [{ raw_text: "Teljes képtámogatás kell.", recorded_at: "2026-10-28T08:20:00Z" }] });
   });
 });

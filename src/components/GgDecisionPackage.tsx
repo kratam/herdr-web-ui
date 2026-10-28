@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { GgAssessment, GgDecision } from "../../shared/gg-overview.ts";
+import type { GgAssessment, GgDecision, GgPreservedAnswer } from "../../shared/gg-overview.ts";
 import type { GgDecisionDetail, GgDecisionReply } from "../../shared/gg-decisions.ts";
 import type { DecisionPackage } from "../lib/ggAttentionBoard.ts";
 import { decisionRequestKey, ggDecisionApi } from "../lib/ggDecisions.ts";
@@ -44,11 +44,14 @@ export function GgDecisionPackage({ pack, unavailable, connection, openPane, sav
       <div><small>{pack.story ?? "Ismeretlen story"}{taskCount > 1 ? " · " + taskCount + " task" : ""}</small><h3>{pack.title}</h3></div>
       {risk && <span className={"gg-risk gg-risk--" + (risk.score >= 4 ? "low" : risk.score === 3 ? "mid" : "high")}>{riskMark(risk.score)} {risk.score}</span>}
     </header>
-    {pack.decisions.map(decision => <DecisionBody key={decision.id} decision={decision} story={pack.story} assessment={pack.assessments[decision.id] ?? null} unavailable={unavailable} connection={connection} openPane={openPane} saved={saved} />)}
+    {pack.decisions.map(decision => <DecisionBody key={decision.id} decision={decision} story={pack.story} assessment={pack.assessments[decision.id] ?? null}
+      briefChanged={decision.id in pack.brief_changed ? pack.brief_changed[decision.id] ?? null : undefined} preserved={pack.preserved[decision.id] ?? []}
+      unavailable={unavailable} connection={connection} openPane={openPane} saved={saved} />)}
   </article>;
 }
 
-function DecisionBody({ decision, story, assessment, unavailable, connection, openPane, saved }: Omit<Props, "pack"> & { decision: GgDecision; story: string | null; assessment: GgAssessment | null }) {
+// briefChanged: undefined = a leírás nem változott; string/null = változott (ekkor óta / ismeretlen időpont)
+function DecisionBody({ decision, story, assessment, briefChanged, preserved, unavailable, connection, openPane, saved }: Omit<Props, "pack"> & { decision: GgDecision; story: string | null; assessment: GgAssessment | null; briefChanged: string | null | undefined; preserved: GgPreservedAnswer[] }) {
   const [detail, setDetail] = useState<GgDecisionDetail | null>(null);
   const [raw, setRaw] = useState(""), [busy, setBusy] = useState<string | null>(null), [error, setError] = useState("");
   const [status, setStatus] = useState(""), [pane, setPane] = useState<{ id: string; started: boolean } | null>(null);
@@ -80,7 +83,8 @@ function DecisionBody({ decision, story, assessment, unavailable, connection, op
     if (!intent.current || intent.current.raw_text !== raw || JSON.stringify(intent.current.binding) !== signature) intent.current = { binding: detail.binding, request_key: decisionRequestKey(), raw_text: raw };
     try {
       const receipt = await ggDecisionApi.reply(intent.current);
-      if (receipt.answer_processing === "ambiguous") setStatus("A válasz megérkezett, de pontosítás kell; a döntés még nyitott. Fogalmazd át, vagy beszéljük át agenttel.");
+      if (receipt.answer_processing === "preserved") { setStatus("A válaszod megvan. A feladat leírása azóta változott, ezért a frissítés után érvényesül; nem kell újraküldeni."); await saved(); }
+      else if (receipt.answer_processing === "ambiguous") setStatus("A válasz megérkezett, de pontosítás kell; a döntés még nyitott. Fogalmazd át, vagy beszéljük át agenttel.");
       else { setStatus("A válasz rögzítve."); await saved(); }
     } catch (error) { setError(error instanceof Error ? error.message : "A mentés nem igazolt."); }
     finally { inFlight.current = false; setBusy(null); }
@@ -100,6 +104,8 @@ function DecisionBody({ decision, story, assessment, unavailable, connection, op
   return <div className="gg-package-body">
     {situation && <p className="gg-package-situation">{situation}</p>}
     <p className="gg-package-question">{detail?.text ?? decision.text}</p>
+    {briefChanged !== undefined && <p className="gg-package-notice" role="note">A feladat leírása {day(briefChanged) ? day(briefChanged) + " óta" : "azóta"} változott. Ha most válaszolsz, a válaszodat elmentjük, és a leírás frissítése után érvényesül.</p>}
+    {preserved.map((answer, index) => <p key={index} className="gg-package-notice" role="note">Válaszod megvan{day(answer.recorded_at) ? " (" + day(answer.recorded_at) + ")" : ""}: „{answer.raw_text}” A leírás frissítése után érvényesül.</p>)}
     <div className="gg-package-facts">
       {proposal && <div><h4>Javaslat</h4><p>{proposal}</p></div>}
       <div><h4>Kockázat</h4><p>{risk ? riskMark(risk.score) + " " + risk.score + (risk.explanation ? " · " + risk.explanation : "") : "Nincs megadva."}</p></div>
@@ -120,7 +126,7 @@ function DecisionBody({ decision, story, assessment, unavailable, connection, op
       {(detail.plans.length > 0 || detail.binding.expected_pr_refs?.length) ? <details><summary>Mire vonatkozik a döntés?</summary><div className="gg-overview-details">{detail.binding.expected_pr_refs?.map(ref => <p key={ref.url}><a href={ref.url} target="_blank" rel="noreferrer">{ref.repository} PR</a><br /><code>{ref.head_sha}</code></p>)}{detail.plans.map(plan => <PlanDetails key={plan.id} plan={plan} />)}</div></details> : null}
       {answerChoices(detail).length > 0 && <div className="gg-decision-actions" role="group" aria-label="Válaszlehetőségek">{answerChoices(detail).map(choice => <button type="button" className="btn btn-ghost gg-choice" aria-pressed={raw === choice.value} key={choice.value} disabled={disabled || Boolean(detail.blocked_reason)} onClick={() => setRaw(choice.value)}>{choice.label}</button>)}</div>}
       <label htmlFor={"answer-" + decision.id}>Válaszod</label><textarea id={"answer-" + decision.id} value={raw} maxLength={16000} rows={3} disabled={Boolean(busy)} onChange={event => setRaw(event.target.value)} placeholder="Saját szavaiddal is válaszolhatsz." />
-      <div className="gg-decision-actions"><button className="btn" type="submit" disabled={disabled || Boolean(detail.blocked_reason) || !raw.trim()}>{busy === "reply" ? "Mentés…" : "Válasz rögzítése"}</button><button className="btn btn-ghost" type="button" disabled={Boolean(busy)} onClick={() => { setDetail(null); setRaw(""); intent.current = null; }}>Mégse</button></div>
+      <div className="gg-decision-actions"><button className="btn" type="submit" disabled={disabled || Boolean(detail.blocked_reason) || !raw.trim()}>{busy === "reply" ? "Mentés…" : briefChanged !== undefined ? "Válasz mentése (a frissítés után érvényesül)" : "Válasz rögzítése"}</button><button className="btn btn-ghost" type="button" disabled={Boolean(busy)} onClick={() => { setDetail(null); setRaw(""); intent.current = null; }}>Mégse</button></div>
     </form>}
     {status && <p className="gg-overview-warning" role="status">{status}</p>}
     {error && <p className="gg-overview-warning" role="alert">{error}{pane && <><br /><button className="gg-overview-link" onClick={() => openPane(pane.id, pane.started)}>Döntések átbeszélése · Tab megnyitása</button></>}</p>}

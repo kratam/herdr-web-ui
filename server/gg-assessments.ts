@@ -1,4 +1,4 @@
-import type { GgAssessment, GgAssessmentContextSection, GgAssessmentFeed } from "../shared/gg-overview.ts";
+import type { GgAssessment, GgAssessmentContextSection, GgAssessmentFeed, GgPreservedAnswer, GgSourceChecks } from "../shared/gg-overview.ts";
 import { callGgTool, type GgToolCall } from "./gg-mcp.ts";
 
 const FRESH_MS = 300_000;
@@ -56,7 +56,52 @@ export function projectAssessments(pages: { tasks: unknown[]; decisions: unknown
     const row = record(raw), story = str(row.story_identifier, 64), title = str(row.title, 500);
     if (story && /^[A-Z][A-Z0-9]*-\d+$/.test(story) && title) stories[story] = title;
   }
-  return { tasks: byId(pages.tasks), decisions: byId(pages.decisions), stories };
+  // az elavult briefre adott, a core által megőrzött válaszok (outcome=stale) döntésenként
+  const preserved: Record<string, GgPreservedAnswer[]> = {};
+  for (const raw of pages.decisions) {
+    const row = record(raw), id = str(row.id, 64);
+    if (!id || !Array.isArray(row.responses)) continue;
+    const answers = row.responses.slice(0, 20).map(record).filter(item => item.outcome === "stale")
+      .flatMap(item => { const text = str(item.raw_owner_text, 4000); return text ? [{ raw_text: text, recorded_at: str(item.source_created_at, 64) }] : []; });
+    if (answers.length) preserved[id] = answers;
+  }
+  return { tasks: byId(pages.tasks), decisions: byId(pages.decisions), stories, preserved };
+}
+
+const STORY = /^[A-Z][A-Z0-9]*-\d+$/;
+/** Az intake forrás-ellenőrzése; nem friss (healthy:false) vagy hibás válasznál null, régi adat alapján nem jelölünk. */
+export function projectSourceChecks(page: unknown): GgSourceChecks | null {
+  const source = record(page);
+  if (source.healthy !== true || !Array.isArray(source.items)) return null;
+  const result: GgSourceChecks = { brief_changed: {}, parked: {} };
+  for (const raw of source.items) {
+    const item = record(raw);
+    if (item.kind === "core_brief_changed") {
+      const task = str(item.task_id, 64);
+      if (task) result.brief_changed[task] = { changed_at: str(item.github_updated_at, 64) };
+    } else if (item.kind === "core_source_parked") {
+      const story = str(item.story_identifier, 64), reason = str(item.reason, 200);
+      if (!story || !STORY.test(story) || !reason) continue;
+      const blockers = (Array.isArray(item.blockers) ? item.blockers.slice(0, 10) : []).map(record)
+        .flatMap(blocker => { const id = str(blocker.identifier, 64); return id && STORY.test(id) ? [{ identifier: id, title: str(blocker.title, 300) }] : []; });
+      result.parked[story] = { reason, blockers };
+    }
+  }
+  return result;
+}
+
+/** Egy intake-fajta minden tétele; a health a legutóbbi oldalé. */
+async function readIntake(call: GgToolCall, kind: string): Promise<{ healthy: boolean; items: unknown[] }> {
+  const items: unknown[] = [];
+  for (;;) {
+    const page = record(await call("autoagent_intake", { kind, limit: PAGE, offset: items.length }));
+    if (!Array.isArray(page.items) || !Number.isInteger(page.total)) throw Error("invalid_intake");
+    if (Number(page.total) > MAX_ITEMS) throw Error("intake_too_large");
+    items.push(...page.items);
+    if (page.healthy !== true) return { healthy: false, items: [] };
+    if (items.length >= Number(page.total)) return { healthy: true, items };
+    if (page.items.length === 0) throw Error("intake_incomplete");
+  }
 }
 
 async function readAll(call: GgToolCall, name: string, args: Record<string, unknown>): Promise<unknown[]> {
@@ -92,7 +137,13 @@ export class GgAssessmentService {
           await readAll(call, "autoagent_decisions", { version: 3, state: "pending" }),
           await readAll(call, "autoagent_work_packages", { version: 3, state: "active" }),
         ];
-        this.cached = { ...projectAssessments({ tasks, decisions, packages }), observed_at: new Date((this.options.now ?? Date.now)()).toISOString(), error: null };
+        // a forrás-ellenőrzés hiánya nem rontja el a felmérést: csak a jelölések maradnak el
+        let checks: GgSourceChecks | null = null;
+        try {
+          const changed = await readIntake(call, "core_brief_changed"), parked = await readIntake(call, "core_source_parked");
+          checks = changed.healthy && parked.healthy ? projectSourceChecks({ healthy: true, items: [...changed.items, ...parked.items] }) : null;
+        } catch { checks = null; }
+        this.cached = { ...projectAssessments({ tasks, decisions, packages }), source_checks: checks, observed_at: new Date((this.options.now ?? Date.now)()).toISOString(), error: null };
       } catch { this.cached = { ...this.cached, error: SOURCE_ERROR }; }
       this.nextRead = (this.options.now ?? Date.now)() + FRESH_MS;
       return this.cached;
