@@ -1,5 +1,6 @@
 import type { PendingMessage } from "../shared/protocol.ts";
 import { agentLaunch } from "./agent-launch.ts";
+import { launchArgsFault } from "../shared/launch-rules.ts";
 import { agentProcesses } from "./conversation.ts";
 import { DEFAULT_DISCUSSION_REPOSITORY, discussionLaunchArgs, discussionWorkspace, GgDiscussionService, selectDiscussionAgent, type DiscussionIdentity } from "./gg-discussion.ts";
 import { repositoryMappings } from "./gg-overview.ts";
@@ -36,7 +37,12 @@ export function discussionRuntime(root: string, usage: UsageService, queue: (pan
       if (!created.root_pane.terminal_id) throw Error("discussion_start_unconfirmed");
       return { pane_id: created.root_pane.pane_id, terminal_id: created.root_pane.terminal_id };
     },
-    start: async (paneId, agent, name, prompt) => (await agentLaunch(paneId, { kind: agent.kind, args: discussionLaunchArgs(agent, prompt), name })).agent_started,
+    start: async (paneId, agent, name, prompt) => {
+      const args = discussionLaunchArgs(agent, prompt);
+      // ugyanaz az ellenőrzés, mint az Ovis többi indításánál
+      if (launchArgsFault(agent.kind, args) !== null) throw Error("discussion_prompt_invalid");
+      return (await agentLaunch(paneId, { kind: agent.kind, args, name })).agent_started;
+    },
     queue: async (pane, text, kind, requester, pid) => {
       const pending = await queue(pane, text, kind, requester, pid);
       return pending.state === "queued" || pending.state === "sending";

@@ -7,6 +7,7 @@ import { writeFileSync } from "node:fs";
 import type { GgDecisionDetail } from "../shared/gg-decisions.ts";
 import { PendingInputError } from "./pending-input.ts";
 import { AGENT_NAME_PATTERN } from "../shared/agent-name.ts";
+import { launchArgsFault, MAX_FIRST_MESSAGE_CHARS } from "../shared/launch-rules.ts";
 
 const roots: string[] = [];
 afterEach(() => { for (const path of roots.splice(0)) rmSync(path, { recursive: true, force: true }); });
@@ -156,4 +157,11 @@ it("elveszett indítási nyugta után a ténylegesen elindult saját agentet ké
   expect((await fixture.service.open(other, "page")).queued).toBeTrue();
   expect((await fixture.service.open(question, "page")).error).toBe("discussion_delivery_unconfirmed");
   expect(fixture.stats()).toEqual({ creates: 1, starts: 1 }); expect(fixture.queued).toHaveLength(1);
+});
+it("a core-ból jövő szöveg vezérlőkarakterei és túlhossza nem jut az indítási argumentumba", async () => {
+  const fixture = setup();
+  await fixture.service.open({ ...question, text: "a\u007fb\u0085c\u009bd" + "x".repeat(30_000) }, "page");
+  const sent = fixture.prompts[0]!;
+  expect(launchArgsFault("claude", discussionLaunchArgs({ kind: "claude", args: [], env: {} }, sent))).toBeNull();
+  expect(sent.length).toBeLessThanOrEqual(MAX_FIRST_MESSAGE_CHARS);
 });
