@@ -213,3 +213,13 @@ A közös agentutasítás előírja: fontossági emberi szándék nélkül új i
 Privát végpontok: `GET /api/gg/host-loads`, `PUT /api/gg/work`.
 Mindkettő a meglévő hitelesítés mögött, csak interaktív helyi kliensnek érhető el;
 a PUT-ra a meglévő same-origin védelem is érvényes. Watch és bridge nem fér hozzá.
+
+## Forrás-ellenőrzés és megőrzött válasz (2. fázis, 2026-10-28)
+
+Az Áttekintés a gg-mb óránkénti forrás-ellenőrzését is olvassa (`autoagent_intake`, `core_brief_changed`,
+`core_source_parked`). Ha a döntés taskjának GitHub-briefje a kérdés óta változott, a kártya ezt kiírja, és a
+mentés gomb „a frissítés után érvényesül” feliratot kap: a core a választ megőrzi (`state: preserved`), az
+automatikus rebrief és az újra-előkészítés után érvényesül. A megőrzött választ a kártya a kérdés alatt mutatja.
+A forrásból jövő parkolás (parking címke, `after-*` mérföldkő, On Hold, nyitott blocked-by a blokkolók nevével)
+elsőbbséget kap a core régi parkolási okai előtt. Nem friss (3 óránál régebbi vagy hibás) intake esetén nincs jelölés.
+
