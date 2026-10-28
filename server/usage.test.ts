@@ -116,7 +116,7 @@ describe("indítási profil kerete", () => {
     const custom = new UsageService({ ...context(), env: { CLAUDE_CONFIG_DIR: join(home, ".claude-secondary") } }, only("claude"));
     expect((await custom.forLaunch())[0]!.env).toEqual({ CLAUDE_CONFIG_DIR: join(home, ".claude-secondary") });
     write(join(home, ".claude", ".credentials.json"), { claudeAiOauth: { accessToken: "default", expiresAt: NOW + HOUR } });
-    expect((await new UsageService(context(), only("claude")).forLaunch())[0]!.env).toEqual({ CLAUDE_CONFIG_DIR: "" });
+    expect((await new UsageService(context(), only("claude")).forLaunch())[0]!.env).toEqual({});
   });
 
   it("azonos token két helyen sem tünteti el a tényleges Codex vagy Claude indítási profilt", async () => {
