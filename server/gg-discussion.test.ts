@@ -2,7 +2,7 @@ import { afterEach, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_DISCUSSION_REPOSITORY, discussionLaunchArgs, discussionWorkspace, discussionRepository, GgDiscussionService, selectDiscussionAgent, type DiscussionIdentity } from "./gg-discussion.ts";
+import { DEFAULT_DISCUSSION_REPOSITORY, discussionLaunchArgs, discussionWorkspace, discussionRepository, GgDiscussionService, selectDiscussionAgent, type DiscussionAgent, type DiscussionIdentity } from "./gg-discussion.ts";
 import { writeFileSync } from "node:fs";
 import type { GgDecisionDetail } from "../shared/gg-decisions.ts";
 import { PendingInputError } from "./pending-input.ts";
@@ -22,7 +22,7 @@ function setup() {
   const deps = {
     inspect: async (_pane: string) => live,
     create: async (_agent: unknown, repository: string) => { creates++; repositories.push(repository); return { pane_id: identity.pane_id, terminal_id: identity.terminal_id }; },
-    choose: async () => ({ kind: "claude" as const, args: ["--model", "sonnet"], env: {} }),
+    choose: async (): Promise<DiscussionAgent> => ({ kind: "claude", args: ["--model", "sonnet"], env: {} }),
     start: async (_pane: string, _choice: unknown, name: string, prompt: string) => { starts++; names.push(name); prompts.push(prompt); live = { ...identity, name }; return true; },
     queue: async (_pane: string, prompt: string) => { prompts.push(prompt); queued.push(prompt); return true; },
     wait: async () => {},
@@ -176,4 +176,15 @@ it("valóban elbukott indítás után ugyanabban a pane-ben újraindít, új tab
   expect(await fixture.service.open(question, "page")).toEqual({ pane_id: identity.pane_id, agent_started: true, queued: true });
   expect(fixture.stats()).toEqual({ creates: 1, starts: 1 });
   expect((await fixture.service.open(question, "page")).queued).toBeTrue(); expect(fixture.queued).toHaveLength(0);
+});
+it("bizonytalan azonosításnál nem nyit új tabot a még futó agent mellé", async () => {
+  const fixture = setup();
+  fixture.deps.start = async () => false;
+  expect((await fixture.service.open(question, "page")).error).toBe("discussion_start_unconfirmed");
+  fixture.deps.inspect = async () => { throw Error("temporary rpc failure"); };
+  await expect(fixture.service.open(other, "page")).rejects.toThrow("temporary rpc failure");
+  fixture.deps.inspect = async () => { throw Error("discussion_identity_unavailable"); };
+  fixture.deps.choose = async () => ({ kind: "codex" as const, args: [], env: {} });
+  expect((await fixture.service.open(other, "page")).error).toBe("discussion_start_unconfirmed");
+  expect(fixture.stats().creates).toBe(1);
 });

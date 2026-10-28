@@ -148,13 +148,12 @@ export class GgDiscussionService {
       catch (error) {
         // Elbukott indítás után a pane él, de agent nincs benne: ugyanott újraindítunk.
         // A Herdr csak szabad shellbe indít, futó agentet így nem írhatunk felül.
-        if (tab.phase !== "starting") throw error;
+        // Átmeneti olvasási hiba vagy eltérő agenttípus esetén nem nyitunk új tabot a még esetleg futó mellé.
+        if (tab.phase !== "starting" || !(error instanceof Error) || error.message !== "discussion_identity_unavailable") throw error;
         const agent = await this.deps.choose();
-        if (agent.kind === tab.agent) {
-          tab.delivered = tab.delivered.filter(item => item.instance !== UNCONFIRMED_START);
-          return this.launch(state, tab, tab.pane, agent, detail, key);
-        }
-        live = null;
+        if (agent.kind !== tab.agent) return { pane_id: tab.pane.pane_id, agent_started: false, queued: false, error: "discussion_start_unconfirmed" };
+        tab.delivered = tab.delivered.filter(item => item.instance !== UNCONFIRMED_START);
+        return this.launch(state, tab, tab.pane, agent, detail, key);
       }
       if (!live) { delete state.tabs[repository]; tab = null; }
       else {
