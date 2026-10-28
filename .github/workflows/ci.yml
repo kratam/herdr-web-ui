@@ -32,6 +32,7 @@ jobs:
     outputs:
       code: ${{ steps.filter.outputs.code }}
       draft: ${{ steps.filter.outputs.draft }}
+      fork: ${{ steps.filter.outputs.fork }}
       linux: ${{ steps.route.outputs.linux }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -55,7 +56,15 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           PR_DRAFT: ${{ github.event.pull_request.draft }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
+          # GG-fork: a local/main-gg-re menő PR csak a saját változásait teszteli; az upstream kódját
+          # az upstream CI-ja már letesztelte (ugyanez az elv, mint a helyi frissítőé).
+          if [ "$EVENT_NAME" = "pull_request" ] && [ "$BASE_REF" = "local/main-gg" ]; then
+            echo "fork=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "fork=false" >> "$GITHUB_OUTPUT"
+          fi
           if [ "$PR_DRAFT" = "true" ]; then
             echo "draft=true" >> "$GITHUB_OUTPUT"
           else
@@ -225,7 +234,7 @@ jobs:
   integration:
     name: Integration tests
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.fork != 'true'
     runs-on: ${{ fromJSON(needs.changes.outputs.linux) }}
     # a wait for a slot counts against it
     timeout-minutes: 50
@@ -272,7 +281,7 @@ jobs:
   browser-main:
     name: Browser regression (ui-regression)
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.fork != 'true'
     runs-on: ${{ fromJSON(needs.changes.outputs.linux) }}
     # a wait for a slot counts against it
     timeout-minutes: 50
@@ -334,7 +343,7 @@ jobs:
   browser-other:
     name: Browser regression (other scripts)
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.fork != 'true'
     runs-on: ${{ fromJSON(needs.changes.outputs.linux) }}
     # a wait for a slot counts against it
     timeout-minutes: 50
@@ -394,9 +403,79 @@ jobs:
             .ci/browser-evidence/**/*.zip
           include-hidden-files: true
           if-no-files-found: ignore
+  browser-fork:
+    # GG-fork: csak a PR által hozzáadott vagy módosított böngészős szkriptek, és GG-változásnál a GG-regressziók.
+    name: Browser regression (fork changes)
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.fork == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CHECK_DIR: ${{ github.workspace }}/.ci
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Skip heavy tests on draft PRs
+        if: needs.changes.outputs.draft == 'true'
+        run: |
+          echo "Draft PR detected, skipping browser-fork tests"
+          exit 0
+      - uses: ./.github/actions/setup-ci
+        if: needs.changes.outputs.draft != 'true'
+        with:
+          node: 'true'
+          herdr: 'true'
+      - run: bun install --frozen-lockfile
+        if: needs.changes.outputs.draft != 'true'
+      - name: Get Playwright version
+        if: needs.changes.outputs.draft != 'true'
+        id: playwright-version
+        run: echo "version=$(bun -e 'console.log(require("playwright-core/package.json").version)')" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browser
+        if: needs.changes.outputs.draft != 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .ci-cache/playwright
+          key: playwright-workspace-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright-version.outputs.version }}
+      - run: bun run build
+        if: needs.changes.outputs.draft != 'true'
+      - name: Browser regression (changed scripts)
+        if: needs.changes.outputs.draft != 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          changed=$(git diff --name-only --diff-filter=AMR "$BASE_SHA" HEAD)
+          scripts=$(echo "$changed" | grep -E '^scripts/[^/]+-(regression|qa)\.ts$' || true)
+          if echo "$changed" | grep -qE '(^|/)(gg-|Gg)'; then
+            scripts=$(printf '%s\n%s\n' "$scripts" "$(ls scripts/gg-*-regression.ts)")
+          fi
+          scripts=$(echo "$scripts" | grep -v '^$' | sort -u || true)
+          if [ -z "$scripts" ]; then
+            echo "No browser script is affected by this pull request"
+            exit 0
+          fi
+          for script in $scripts; do
+            [ -f "$script" ] || continue
+            echo "::group::$script"
+            bun run check run -- bun "$script"
+            echo "::endgroup::"
+          done
+      - name: Preserve browser logs and evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-fork-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .ci/report.json
+            .ci/browser-logs/**
+          include-hidden-files: true
+          if-no-files-found: ignore
   integration-browser:
     name: Integration and browser
-    needs: [changes, integration, browser-main, browser-other]
+    needs: [changes, integration, browser-main, browser-other, browser-fork]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -408,6 +487,8 @@ jobs:
           INTEGRATION_RESULT: ${{ needs.integration.result }}
           BROWSER_MAIN_RESULT: ${{ needs.browser-main.result }}
           BROWSER_OTHER_RESULT: ${{ needs.browser-other.result }}
+          FORK: ${{ needs.changes.outputs.fork }}
+          BROWSER_FORK_RESULT: ${{ needs.browser-fork.result }}
         run: |
           if [ "$CODE" = "false" ]; then
             echo "Skipped: only documentation changes"
@@ -418,6 +499,14 @@ jobs:
           if [ "$DRAFT" = "true" ]; then
             echo "::error::Draft PR: integration and browser tests did not run. Mark the PR ready for review to run them."
             exit 1
+          fi
+          if [ "$FORK" = "true" ]; then
+            if [ "$BROWSER_FORK_RESULT" != "success" ]; then
+              echo "Browser regression (fork changes) failed"
+              exit 1
+            fi
+            echo "Fork changes passed (upstream suites are covered by upstream CI)"
+            exit 0
           fi
           if [ "$INTEGRATION_RESULT" != "success" ]; then
             echo "Integration tests failed"
