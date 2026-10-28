@@ -39,9 +39,12 @@ nem a kijelzőn megjelenő többi fiókét. Ugyanazt a nem titkos profilútvonal
 adja át az új tab környezetében (alapprofilnál semmilyen `CLAUDE_CONFIG_DIR`-t:
 az üres értéket a Claude a munkakönyvtárnak venné); globális konfigurációt nem módosít. Hiányzó
 vagy nem mért elsődleges profil helyett egy tartalék fiók kerete nem használható.
-Új tabnál a döntés kontextusa egysoros kezdő üzenetként az indítás része, így nem
-függ attól, mikor ismeri fel a Herdr az agentet (az `agent.start` azonnal visszatér,
-a felismerés kb. 1 mp). Meglévő tabnál az Ovis böngésző- és sessionazonossághoz
+Új tabnál a döntés azonosítója rövid (≤ 600 bájt) kezdő üzenetként az indítás része,
+így nem függ attól, mikor ismeri fel a Herdr az agentet (az `agent.start` azonnal
+visszatér, a felismerés kb. 1 mp). A döntés szövegét nem visszük át: a Herdr a friss,
+még töltődő shellbe gépeli az indítóparancsot, és macOS-en a bemenet kb. 1 KB után
+csonkul (mérve 2026-10-28); a részleteket az agent az agent-decisions skillel olvassa be.
+A tab neve `Döntés: <story>`, újrahasználatkor az aktuális storyra vált. Meglévő tabnál az Ovis böngésző- és sessionazonossághoz
 kötött üzenetsora adja át. A tényleges emberi választ az agent-decisions skill kezeli.
 Interaktív koordinátorok saját kérdései továbbra is a saját beszélgetésükben maradnak.
 

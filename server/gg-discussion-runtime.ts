@@ -4,7 +4,7 @@ import { launchArgsFault } from "../shared/launch-rules.ts";
 import { agentProcesses } from "./conversation.ts";
 import { DEFAULT_DISCUSSION_REPOSITORY, discussionLaunchArgs, discussionWorkspace, GgDiscussionService, selectDiscussionAgent, type DiscussionIdentity } from "./gg-discussion.ts";
 import { repositoryMappings } from "./gg-overview.ts";
-import { paneProcessInfo, sessionSnapshot, tabCreate, workspaceCreate } from "./herdr/client.ts";
+import { paneProcessInfo, sessionSnapshot, tabCreate, tabRename, workspaceCreate } from "./herdr/client.ts";
 import { processStartedAt } from "./process-start.ts";
 import type { UsageService } from "./usage.ts";
 
@@ -14,6 +14,8 @@ export function discussionRuntime(root: string, usage: UsageService, queue: (pan
     const snapshot = await sessionSnapshot();
     const pane = snapshot.panes.find(row => row.pane_id === paneId);
     if (!pane) return null;
+    // a Herdr nem lát agentet a pane-ben: nem bizonytalanság, hanem bizonyított hiány
+    if (!pane.agent) throw Error("discussion_agent_absent");
     const agent = snapshot.agents.find(row => row.pane_id === paneId);
     if (!agent?.name || !pane.agent || !pane.terminal_id) throw Error("discussion_identity_unavailable");
     const info = await paneProcessInfo(paneId);
@@ -42,6 +44,10 @@ export function discussionRuntime(root: string, usage: UsageService, queue: (pan
       // ugyanaz az ellenőrzés, mint az Ovis többi indításánál
       if (launchArgsFault(agent.kind, args) !== null) throw Error("discussion_prompt_invalid");
       return (await agentLaunch(paneId, { kind: agent.kind, args, name })).agent_started;
+    },
+    label: async (paneId, label) => {
+      const tab = (await sessionSnapshot()).panes.find(pane => pane.pane_id === paneId)?.tab_id;
+      if (tab) await tabRename(tab, label);
     },
     queue: async (pane, text, kind, requester, pid) => {
       const pending = await queue(pane, text, kind, requester, pid);
