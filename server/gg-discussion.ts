@@ -123,7 +123,8 @@ export class GgDiscussionService {
       else {
         // Csak a Herdr által már nyugtázott indítást fejezhetjük be; az egyedi RPC-név
         // a saját indításé, nem a felhasználó által szabadon átírható tabcím.
-        if (tab.phase === "binding") this.bind(state, tab, live);
+        // „starting”: az indítás nyugtája elveszhetett, de a saját egyedi nevű agent ettől még futhat.
+        if (tab.phase === "binding" || tab.phase === "starting") this.bind(state, tab, live);
         const bound = tab.identity;
         if (tab.phase !== "running" || !bound) return { pane_id: tab.pane.pane_id, agent_started: false, queued: false, error: "discussion_start_unconfirmed" };
         const lease = (value: DiscussionIdentity) => ({ terminalId: value.terminal_id, agent: value.agent, processPid: value.process_pid, processBirth: value.process_birth, session: value.session });
@@ -148,7 +149,11 @@ export class GgDiscussionService {
       const pane = tab.pane;
       try {
         if (!await this.deps.start(pane.pane_id, agent, tab.name, prompt(detail))) throw Error("start_failed");
-      } catch { return { pane_id: pane.pane_id, agent_started: false, queued: false, error: "discussion_start_unconfirmed" }; }
+      } catch {
+        // Ha mégis elindult, a kezdő üzenet bemehetett: ezt a döntést nem küldjük újra, csak bizonytalannak jelezzük.
+        tab.delivered.push({ key, instance: "unconfirmed-start", queued: false }); this.save(state);
+        return { pane_id: pane.pane_id, agent_started: false, queued: false, error: "discussion_start_unconfirmed" };
+      }
       // A kontextus a kezdő üzenettel már bement; a tab igazolása ettől függetlenül pótolható.
       tab.delivered.push({ key, instance: this.instance, queued: true }); tab.phase = "binding"; this.save(state);
       try {

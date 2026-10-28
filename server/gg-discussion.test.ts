@@ -148,3 +148,12 @@ it("a repó workspace-ét a fő checkout pane-jéről, ennek híján a workspace
   expect(discussionWorkspace({ panes: [{ workspace_id: "w1", cwd: "/wt/gg3-app-feature" }], workspaces }, "/x/gg3-app", "gg3-app")).toBe("w1");
   expect(discussionWorkspace({ panes: [], workspaces }, "/x/other", "other")).toBeNull();
 });
+it("elveszett indítási nyugta után a ténylegesen elindult saját agentet később igazolja, az első üzenetet nem küldi újra", async () => {
+  const fixture = setup(), start = fixture.deps.start;
+  fixture.deps.start = async (...args: Parameters<typeof start>) => { await start(...args); throw Error("rpc reply lost"); };
+  expect((await fixture.service.open(question, "page")).error).toBe("discussion_start_unconfirmed");
+  fixture.deps.start = start;
+  expect((await fixture.service.open(other, "page")).queued).toBeTrue();
+  expect((await fixture.service.open(question, "page")).error).toBe("discussion_delivery_unconfirmed");
+  expect(fixture.stats()).toEqual({ creates: 1, starts: 1 }); expect(fixture.queued).toHaveLength(1);
+});
