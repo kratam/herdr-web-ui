@@ -1,6 +1,52 @@
 import { describe, expect, it, spyOn } from "bun:test";
+import * as fs from "node:fs";
 import { decideAccess, type AccessInput } from "./access.ts";
-import { HTTPS_PORTS, httpsPorts, parseSoleTailnetLogin, parseTailscale, parseTailscaleIp, TailnetIdentitySource, type TailnetIdentity } from "./tailscale.ts";
+import { HTTPS_PORTS, httpsPorts, parseSoleTailnetLogin, parseTailscale, parseTailscaleIp, tailscaleBinary, tailscaleCommand, TailnetIdentitySource, type TailnetIdentity } from "./tailscale.ts";
+
+describe("Tailscale CLI discovery", () => {
+  const app = "/Applications/Tailscale.app/Contents/MacOS/Tailscale";
+  const socket = "/var/run/tailscaled.socket";
+  const local = "/usr/local/bin/tailscale";
+  const brew = "/opt/homebrew/bin/tailscale";
+
+  it("finds standalone CLIs outside a restricted PATH before trying the app", () => {
+    const which = spyOn(Bun, "which").mockImplementation((name) => name === local ? local : null);
+    const exists = spyOn(fs, "existsSync").mockImplementation(() => true);
+    try {
+      expect(tailscaleBinary()).toBe(local);
+      which.mockImplementation((name) => name === brew ? brew : null);
+      expect(tailscaleBinary()).toBe(brew);
+      which.mockImplementation((name) => name === "tailscale" ? "/custom/bin/tailscale" : null);
+      expect(tailscaleBinary()).toBe("/custom/bin/tailscale");
+    } finally { which.mockRestore(); exists.mockRestore(); }
+  });
+
+  it("never falls back to the GUI while a standalone daemon socket exists", () => {
+    const which = spyOn(Bun, "which").mockImplementation(() => null);
+    const exists = spyOn(fs, "existsSync").mockImplementation(() => true);
+    try {
+      expect(tailscaleBinary()).toBeNull();
+      which.mockImplementation((name) => name === "tailscale" ? app : null);
+      expect(tailscaleBinary()).toBeNull();
+      exists.mockImplementation((path) => String(path) !== socket);
+      expect(tailscaleBinary()).toBe(app);
+      which.mockImplementation(() => null);
+      expect(tailscaleBinary()).toBe(app);
+      exists.mockImplementation(() => false);
+      expect(tailscaleBinary()).toBeNull();
+    } finally { which.mockRestore(); exists.mockRestore(); }
+  });
+
+  it("pins standalone commands to their daemon, including plugin serve commands", () => {
+    const exists = spyOn(fs, "existsSync").mockImplementation((path) => String(path) === socket);
+    try {
+      expect(tailscaleCommand(local, ["status", "--json"])).toEqual([local, `--socket=${socket}`, "status", "--json"]);
+      expect(tailscaleCommand(local, ["serve", "--yes", "--bg", "http://127.0.0.1:7317"])).toEqual([local, `--socket=${socket}`, "serve", "--yes", "--bg", "http://127.0.0.1:7317"]);
+      exists.mockImplementation(() => false);
+      expect(tailscaleCommand(app, ["status", "--json"])).toEqual([app, "status", "--json"]);
+    } finally { exists.mockRestore(); }
+  });
+});
 
 const status = (state = "Running", dns = "pc.example.ts.net.") => JSON.stringify({ BackendState: state, Self: { DNSName: dns } });
 /** a `tailscale serve status --json` document: listeners by port, and one "/" proxy per host:port */

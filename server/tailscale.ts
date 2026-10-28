@@ -4,13 +4,14 @@
  * The Settings → Phone panel turns the answer into the address that already works, or the one
  * command the user still has to run on this PC.
  */
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import type { RemoteAccess, TailscaleAccess } from "../shared/protocol.ts";
 import { addressesNode } from "./access.ts";
 
 const TIMEOUT_MS = 2500;
 /** the macOS App Store build puts no `tailscale` on the PATH; its CLI lives in the app bundle */
 const MAC_APP_CLI = "/Applications/Tailscale.app/Contents/MacOS/Tailscale";
+const DAEMON_SOCKET = "/var/run/tailscaled.socket";
 /** HTTPS ports to suggest, the conventional one first; a port another service already uses is skipped */
 export const HTTPS_PORTS: readonly number[] = [443, 8443, 7317, 17317];
 /** names the one HTTPS port to publish the app on, for a user who keeps 443 for something else */
@@ -101,11 +102,28 @@ export function parseTailscale(output: TailscaleOutput | null, port: number, can
 }
 
 export function tailscaleBinary(): string | null {
-  return Bun.which("tailscale") ?? (existsSync(MAC_APP_CLI) ? MAC_APP_CLI : null);
+  const standalone = existsSync(DAEMON_SOCKET);
+  for (const name of ["tailscale", "/usr/local/bin/tailscale", "/opt/homebrew/bin/tailscale"]) {
+    const binary = Bun.which(name);
+    if (binary !== null && (!standalone || !isMacAppCli(binary))) return binary;
+  }
+  // Az app CLI-je a kijelentkezett GUI-démont is elindíthatja; a másik démont ne fedje el.
+  return !standalone && existsSync(MAC_APP_CLI) ? MAC_APP_CLI : null;
+}
+
+function isMacAppCli(binary: string): boolean {
+  // A macOS CLI-integráció symlinkkel is mutathat az appra.
+  try { return realpathSync(binary).includes("/Tailscale.app/"); }
+  catch { return binary.includes("/Tailscale.app/"); }
+}
+
+/** A státuszolvasás és a plugin megosztása ugyanazt a démont használja. */
+export function tailscaleCommand(binary: string, args: string[]): [string, ...string[]] {
+  return [binary, ...(existsSync(DAEMON_SOCKET) && !isMacAppCli(binary) ? [`--socket=${DAEMON_SOCKET}`] : []), ...args];
 }
 
 async function run(binary: string, args: string[]): Promise<string | null> {
-  const proc = Bun.spawn([binary, ...args], { windowsHide: true, stdin: "ignore", stdout: "pipe", stderr: "ignore" });
+  const proc = Bun.spawn(tailscaleCommand(binary, args), { windowsHide: true, stdin: "ignore", stdout: "pipe", stderr: "ignore" });
   const timer = setTimeout(() => proc.kill(), TIMEOUT_MS);
   try {
     const [text, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
