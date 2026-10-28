@@ -39,7 +39,7 @@ import { approveWaiting, COMMAND_ALIASES, discardTyped, link as linkPc, type Wai
 import { activePluginScript } from "./plugin-runtime.ts";
 import { accountServiceOrigin, DEFAULT_ACCOUNT_SERVICE } from "../server/static.ts";
 import { herdrStateDir } from "./plugin-state.ts";
-import { HTTPS_PORT_VARIABLE, HTTPS_PORTS, httpsPorts, parseTailscale, parseTailscaleIp, parseTailscaleOwner, readTailscale, tailscaleBinary } from "../server/tailscale.ts";
+import { HTTPS_PORT_VARIABLE, HTTPS_PORTS, httpsPorts, parseTailscale, parseTailscaleIp, parseTailscaleOwner, readTailscale, tailscaleBinary, tailscaleCommand } from "../server/tailscale.ts";
 import { descendantProcesses, windowsArgv, windowsProcessTable } from "../server/windows-processes.ts";
 
 /**
@@ -979,7 +979,7 @@ async function phone(): Promise<number> {
     }
     say(`Publishing the app to your tailnet: ${access.serve_command}`);
     const [, ...args] = access.serve_command.split(" ");
-    const serve = Bun.spawn([binary, ...args.slice(0, 1), "--yes", ...args.slice(1)], { windowsHide: true, stdin: "ignore", stdout: "inherit", stderr: "inherit" });
+    const serve = Bun.spawn(tailscaleCommand(binary, [...args.slice(0, 1), "--yes", ...args.slice(1)]), { windowsHide: true, stdin: "ignore", stdout: "inherit", stderr: "inherit" });
     const timer = setTimeout(() => serve.kill(), SERVE_TIMEOUT_MS);
     const code = await serve.exited;
     clearTimeout(timer);
