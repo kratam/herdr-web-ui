@@ -165,3 +165,15 @@ it("a core-ból jövő szöveg vezérlőkarakterei és túlhossza nem jut az ind
   expect(launchArgsFault("claude", discussionLaunchArgs({ kind: "claude", args: [], env: {} }, sent))).toBeNull();
   expect(sent.length).toBeLessThanOrEqual(MAX_FIRST_MESSAGE_CHARS);
 });
+it("valóban elbukott indítás után ugyanabban a pane-ben újraindít, új tab nélkül", async () => {
+  const fixture = setup(), start = fixture.deps.start, inspect = fixture.deps.inspect;
+  fixture.deps.start = async () => false;
+  fixture.deps.inspect = async () => { throw Error("discussion_identity_unavailable"); };
+  expect((await fixture.service.open(question, "page")).error).toBe("discussion_start_unconfirmed");
+  fixture.deps.start = start;
+  const retried = fixture.deps.inspect; let first = true;
+  fixture.deps.inspect = async (pane: string) => { if (first) { first = false; return retried(pane); } return inspect(pane); };
+  expect(await fixture.service.open(question, "page")).toEqual({ pane_id: identity.pane_id, agent_started: true, queued: true });
+  expect(fixture.stats()).toEqual({ creates: 1, starts: 1 });
+  expect((await fixture.service.open(question, "page")).queued).toBeTrue(); expect(fixture.queued).toHaveLength(0);
+});

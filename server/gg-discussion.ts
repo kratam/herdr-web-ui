@@ -34,6 +34,7 @@ interface DiscussionState { version: 2; tabs: Record<string, DiscussionTab> }
 export const DEFAULT_DISCUSSION_REPOSITORY = "GuestGuru/gg-agent-skills";
 /** Az indítás utáni felismerésre ennyiszer várunk (Herdr ~1 mp alatt ismeri fel az agentet). */
 const BIND_ATTEMPTS = 20, BIND_DELAY_MS = 500;
+const UNCONFIRMED_START = "unconfirmed-start";
 
 /** A task első, helyben elérhető repója; ha nincs ilyen, a gg-agent-skills. */
 export function discussionRepository(overview: { tasks: readonly { id: string; repositories: readonly string[] }[]; repositories: readonly { repository: string; path: string | null }[] }, taskId: string): string {
@@ -110,6 +111,23 @@ export class GgDiscussionService {
     if (!tab.pane || live.pane_id !== tab.pane.pane_id || live.terminal_id !== tab.pane.terminal_id || live.agent !== tab.agent || live.name !== tab.name || !live.process_pid || !live.process_birth) throw Error("discussion_identity_changed");
     tab.identity = live; tab.phase = "running"; this.save(state);
   }
+  private async launch(state: DiscussionState, tab: DiscussionTab, pane: { pane_id: string; terminal_id: string }, agent: DiscussionAgent, detail: GgDecisionDetail, key: string): Promise<GgDiscussionReceipt> {
+    tab.phase = "starting"; this.save(state);
+    try {
+      if (!await this.deps.start(pane.pane_id, agent, tab.name, prompt(detail))) throw Error("start_failed");
+    } catch {
+      // Ha mégis elindult, a kezdő üzenet bemehetett: ezt a döntést nem küldjük újra, csak bizonytalannak jelezzük.
+      tab.delivered.push({ key, instance: UNCONFIRMED_START, queued: false }); this.save(state);
+      return { pane_id: pane.pane_id, agent_started: false, queued: false, error: "discussion_start_unconfirmed" };
+    }
+    // A kontextus a kezdő üzenettel már bement; a tab igazolása ettől függetlenül pótolható.
+    tab.delivered.push({ key, instance: this.instance, queued: true }); tab.phase = "binding"; this.save(state);
+    try {
+      const live = await this.settle(pane.pane_id);
+      if (live) this.bind(state, tab, live);
+    } catch { /* A következő kattintás újra megpróbálja igazolni; az üzenet már a tabban van. */ }
+    return { pane_id: pane.pane_id, agent_started: true, queued: true };
+  }
   /** Indítás után a Herdr csak kis késéssel ismeri fel az agentet; addig az azonosítás hibát ad. */
   private async settle(paneId: string): Promise<DiscussionIdentity | null> {
     for (let attempt = 1; ; attempt++) {
@@ -125,7 +143,19 @@ export class GgDiscussionService {
     let tab: DiscussionTab | null = state.tabs[repository] ?? null;
     const key = `${detail.binding.decision_id}:${detail.binding.expected_epoch}:${detail.binding.expected_source_revision}`;
     if (tab?.pane) {
-      const live = await this.deps.inspect(tab.pane.pane_id);
+      let live: DiscussionIdentity | null;
+      try { live = await this.deps.inspect(tab.pane.pane_id); }
+      catch (error) {
+        // Elbukott indítás után a pane él, de agent nincs benne: ugyanott újraindítunk.
+        // A Herdr csak szabad shellbe indít, futó agentet így nem írhatunk felül.
+        if (tab.phase !== "starting") throw error;
+        const agent = await this.deps.choose();
+        if (agent.kind === tab.agent) {
+          tab.delivered = tab.delivered.filter(item => item.instance !== UNCONFIRMED_START);
+          return this.launch(state, tab, tab.pane, agent, detail, key);
+        }
+        live = null;
+      }
       if (!live) { delete state.tabs[repository]; tab = null; }
       else {
         // Csak a Herdr által már nyugtázott indítást fejezhetjük be; az egyedi RPC-név
@@ -152,22 +182,7 @@ export class GgDiscussionService {
         }
         throw error;
       }
-      tab.phase = "starting"; this.save(state);
-      const pane = tab.pane;
-      try {
-        if (!await this.deps.start(pane.pane_id, agent, tab.name, prompt(detail))) throw Error("start_failed");
-      } catch {
-        // Ha mégis elindult, a kezdő üzenet bemehetett: ezt a döntést nem küldjük újra, csak bizonytalannak jelezzük.
-        tab.delivered.push({ key, instance: "unconfirmed-start", queued: false }); this.save(state);
-        return { pane_id: pane.pane_id, agent_started: false, queued: false, error: "discussion_start_unconfirmed" };
-      }
-      // A kontextus a kezdő üzenettel már bement; a tab igazolása ettől függetlenül pótolható.
-      tab.delivered.push({ key, instance: this.instance, queued: true }); tab.phase = "binding"; this.save(state);
-      try {
-        const live = await this.settle(pane.pane_id);
-        if (live) this.bind(state, tab, live);
-      } catch { /* A következő kattintás újra megpróbálja igazolni; az üzenet már a tabban van. */ }
-      return { pane_id: pane.pane_id, agent_started: true, queued: true };
+      return this.launch(state, tab, tab.pane, agent, detail, key);
     }
     if (!tab.pane || !tab.identity) throw Error("discussion_start_unconfirmed");
     const receipt = { pane_id: tab.pane.pane_id, agent_started: true };
