@@ -20,6 +20,7 @@ export interface DiscussionDeps {
   wait?(ms: number): Promise<void>;
   /** A tab nevét az átbeszélt storyra állítja; a hibája nem akasztja meg az átbeszélést. */
   label?(paneId: string, label: string): Promise<void>;
+  now?(): number;
 }
 interface DiscussionTab {
   phase: "creating" | "starting" | "binding" | "running";
@@ -29,6 +30,8 @@ interface DiscussionTab {
   identity: DiscussionIdentity | null;
   delivered: { key: string; instance: string; queued: boolean }[];
   delivering: string | null;
+  /** Az utolsó indítás ideje; enélkül (régi állapot) az indítás régen történt. */
+  started_at?: number;
 }
 /** Repónként egy átbeszélő tab: a kulcs a workspace repója. */
 interface DiscussionState { version: 2; tabs: Record<string, DiscussionTab> }
@@ -37,6 +40,8 @@ export const DEFAULT_DISCUSSION_REPOSITORY = "GuestGuru/gg-agent-skills";
 /** Az indítás utáni felismerésre ennyiszer várunk (Herdr ~1 mp alatt ismeri fel az agentet). */
 const BIND_ATTEMPTS = 20, BIND_DELAY_MS = 500;
 const UNCONFIRMED_START = "unconfirmed-start";
+/** Ennyi idő után egy agent nélküli, el nem indult tab biztosan nem indul már el. */
+const ABANDON_AFTER_MS = 2 * 60_000;
 
 /** A task első, helyben elérhető repója; ha nincs ilyen, a gg-agent-skills. */
 export function discussionRepository(overview: { tasks: readonly { id: string; repositories: readonly string[] }[]; repositories: readonly { repository: string; path: string | null }[] }, taskId: string): string {
@@ -119,7 +124,7 @@ export class GgDiscussionService {
     tab.identity = live; tab.phase = "running"; this.save(state);
   }
   private async launch(state: DiscussionState, tab: DiscussionTab, pane: { pane_id: string; terminal_id: string }, agent: DiscussionAgent, detail: GgDecisionDetail, key: string): Promise<GgDiscussionReceipt> {
-    tab.phase = "starting"; this.save(state);
+    tab.phase = "starting"; tab.started_at = (this.deps.now ?? Date.now)(); this.save(state);
     try {
       if (!await this.deps.start(pane.pane_id, agent, tab.name, prompt(detail))) throw Error("start_failed");
     } catch {
@@ -158,7 +163,12 @@ export class GgDiscussionService {
         // Elbukott indítás után a pane él, de agent nincs benne: ugyanott újraindítunk.
         // A Herdr csak szabad shellbe indít, futó agentet így nem írhatunk felül.
         // A pane él, de a Herdr nem lát benne agentet: a tab elhagyható (félbegépelt parancs is lehet a shellben).
-        if (error instanceof Error && error.message === "discussion_agent_absent") live = null;
+        if (error instanceof Error && error.message === "discussion_agent_absent") {
+          // Frissen indított, még fel nem ismert agent mellé nem nyitunk másik tabot.
+          const now = (this.deps.now ?? Date.now)();
+          if (tab.phase !== "running" && tab.started_at !== undefined && now - tab.started_at < ABANDON_AFTER_MS) return { pane_id: tab.pane.pane_id, agent_started: false, queued: false, error: "discussion_start_unconfirmed" };
+          live = null;
+        }
         else {
           // Átmeneti olvasási hiba vagy eltérő agenttípus esetén nem nyitunk új tabot a még esetleg futó mellé.
           if (tab.phase !== "starting" || !(error instanceof Error) || error.message !== "discussion_identity_unavailable") throw error;

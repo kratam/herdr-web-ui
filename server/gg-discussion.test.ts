@@ -220,7 +220,11 @@ it("ha a tab pane-jében bizonyítottan nem fut agent, új tabot nyit (a félbeg
   fixture.deps.inspect = async () => { throw Error("discussion_identity_unavailable"); };
   await fixture.service.open(question, "page");
   fixture.deps.inspect = async () => { throw Error("discussion_agent_absent"); };
+  // frissen indított, még fel nem ismert agent mellé nem nyitunk másik tabot
+  expect((await fixture.service.open(other, "page")).error).toBe("discussion_start_unconfirmed");
+  expect(fixture.stats().creates).toBe(1);
   fixture.deps.start = async (_pane: string, _agent: unknown, name: string, prompt: string) => { fixture.prompts.push(prompt); fixture.replace({ ...identity, name }); fixture.deps.inspect = inspect; return true; };
-  const reopened = await fixture.service.open(other, "page");
+  const later = new GgDiscussionService(fixture.root, { ...fixture.deps, inspect: (pane: string) => fixture.deps.inspect(pane), now: () => Date.now() + 3 * 60_000 });
+  const reopened = await later.open(other, "page");
   expect(reopened.queued).toBeTrue(); expect(fixture.stats().creates).toBe(2);
 });
