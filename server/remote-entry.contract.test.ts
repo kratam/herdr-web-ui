@@ -12,14 +12,19 @@ describe("remote entry shell agents", () => {
     const home = join(root, "home");
     const xdg = join(root, "xdg");
     const login = join(root, "login bin");
+    const serviceBin = join(root, "service bin");
     const bridges = join(home, ".config/herdr-web-ui/bridges");
     mkdirSync(login);
+    mkdirSync(serviceBin);
+    // A teszt ne indítsa el a gép Tailscale.app-ját, ha a szűk PATH-on nincs CLI.
+    writeFileSync(join(serviceBin, "tailscale"), "#!/bin/sh\nprintf '%s\\n' '{\"BackendState\":\"Stopped\"}'\n", { mode: 0o755 });
     mkdirSync(bridges, { recursive: true, mode: 0o700 });
     writeFileSync(join(login, "gjc"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
     // the user's login shell: its profile adds `login bin`; any other use is a plain shell
     const shell = join(root, "login-shell");
     writeFileSync(shell, `#!/bin/sh\nif [ "$1" = "-l" ] && [ "$2" = "-c" ]; then PATH='${login}:/usr/bin:/bin'; export PATH; exec /bin/sh -c "$3"; fi\nexec /bin/sh "$@"\n`, { mode: 0o755 });
-    const servicePath = "/usr/bin:/bin";
+    const servicePath = `${serviceBin}:/usr/bin:/bin`;
+    expect(Bun.which("tailscale", { PATH: servicePath })).toBe(join(serviceBin, "tailscale"));
     expect(Bun.which("gjc", { PATH: servicePath })).toBeNull();
     const session = "t51";
     const env = { PATH: servicePath, HOME: home, SHELL: shell, XDG_CONFIG_HOME: xdg, XDG_STATE_HOME: join(root, "state"), HERDR_REMOTE_SESSION: session, OVIS_HERDR_BIN: herdr! };
