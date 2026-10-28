@@ -14,6 +14,8 @@ export function discussionRuntime(root: string, usage: UsageService, queue: (pan
     const snapshot = await sessionSnapshot();
     const pane = snapshot.panes.find(row => row.pane_id === paneId);
     if (!pane) return null;
+    // a Herdr nem lát agentet a pane-ben: nem bizonytalanság, hanem bizonyított hiány
+    if (!pane.agent) throw Error("discussion_agent_absent");
     const agent = snapshot.agents.find(row => row.pane_id === paneId);
     if (!agent?.name || !pane.agent || !pane.terminal_id) throw Error("discussion_identity_unavailable");
     const info = await paneProcessInfo(paneId);

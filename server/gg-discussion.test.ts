@@ -215,3 +215,12 @@ it("a tab neve az átbeszélt story azonosítója, újrahasználatkor is az aktu
   await fixture.service.open({ ...other, story: "IT-2" }, "page");
   expect(fixture.labels).toEqual(["Döntés: IT-1", "Döntés: IT-2"]);
 });
+it("ha a tab pane-jében bizonyítottan nem fut agent, új tabot nyit (a félbegépelt parancsú shellt nem használja)", async () => {
+  const fixture = setup(), inspect = fixture.deps.inspect;
+  fixture.deps.inspect = async () => { throw Error("discussion_identity_unavailable"); };
+  await fixture.service.open(question, "page");
+  fixture.deps.inspect = async () => { throw Error("discussion_agent_absent"); };
+  fixture.deps.start = async (_pane: string, _agent: unknown, name: string, prompt: string) => { fixture.prompts.push(prompt); fixture.replace({ ...identity, name }); fixture.deps.inspect = inspect; return true; };
+  const reopened = await fixture.service.open(other, "page");
+  expect(reopened.queued).toBeTrue(); expect(fixture.stats().creates).toBe(2);
+});
