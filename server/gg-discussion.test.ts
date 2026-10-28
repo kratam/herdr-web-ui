@@ -18,7 +18,7 @@ const identity: DiscussionIdentity = { pane_id: "w1:p3", terminal_id: "terminal-
 function setup() {
   const root = mkdtempSync(join(tmpdir(), "ovis-decision-test-")); roots.push(root);
   let live: DiscussionIdentity | null = null, creates = 0, starts = 0;
-  const prompts: string[] = [], names: string[] = [], queued: string[] = [], repositories: string[] = [];
+  const prompts: string[] = [], names: string[] = [], queued: string[] = [], repositories: string[] = [], labels: string[] = [];
   const deps = {
     inspect: async (_pane: string) => live,
     create: async (_agent: unknown, repository: string) => { creates++; repositories.push(repository); return { pane_id: identity.pane_id, terminal_id: identity.terminal_id }; },
@@ -26,8 +26,9 @@ function setup() {
     start: async (_pane: string, _choice: unknown, name: string, prompt: string) => { starts++; names.push(name); prompts.push(prompt); live = { ...identity, name }; return true; },
     queue: async (_pane: string, prompt: string) => { prompts.push(prompt); queued.push(prompt); return true; },
     wait: async () => {},
+    label: async (_pane: string, label: string) => { labels.push(label); },
   };
-  return { root, deps, service: new GgDiscussionService(root, deps), prompts, names, queued, repositories, stats: () => ({ creates, starts }), replace: (next: DiscussionIdentity | null) => { live = next; } };
+  return { root, deps, service: new GgDiscussionService(root, deps), prompts, names, queued, repositories, labels, stats: () => ({ creates, starts }), replace: (next: DiscussionIdentity | null) => { live = next; } };
 }
 it("két egyidejű kattintás egy tabot és egy döntési üzenetet hoz létre, újraindítás után is ugyanazt használja", async () => {
   const fixture = setup();
@@ -108,7 +109,7 @@ it("új tabnál a döntés kontextusa egysoros kezdő üzenetként indul, üzene
   const fixture = setup(); const result = await fixture.service.open(question, "page");
   expect(result).toEqual({ pane_id: identity.pane_id, agent_started: true, queued: true });
   expect(fixture.queued).toHaveLength(0); expect(fixture.prompts[0]).not.toMatch(/[\n\r\t]/);
-  expect(fixture.prompts[0]).toContain("A kép látszódjon?");
+  expect(fixture.prompts[0]).toContain(question.binding.decision_id);
 });
 it("a Herdr késői felismerését kivárja, mielőtt a tabot a sajátjának igazolja", async () => {
   const fixture = setup(), inspect = fixture.deps.inspect; let calls = 0;
@@ -198,4 +199,19 @@ it("elutasított újraindítás után a korábbi bizonytalan döntést sem küld
   fixture.deps.inspect = inspect;
   expect((await fixture.service.open(question, "page")).error).toBe("discussion_delivery_unconfirmed");
   expect(fixture.queued).toHaveLength(0);
+});
+it("a kezdő üzenet rövid: csak a story és a döntés azonosítója, a core szövege nem kerül a parancssorba", async () => {
+  const fixture = setup();
+  await fixture.service.open({ ...question, story: "IT-12345", text: "Hosszú kérdés ".repeat(500), proposal: "Javaslat ".repeat(500) }, "page");
+  const sent = fixture.prompts[0]!;
+  // friss shellbe gépelve macOS-en kb. 1 KB után csonkul a bemenet, ezért bőven alatta maradunk
+  expect(new TextEncoder().encode(sent).length).toBeLessThanOrEqual(600);
+  expect(sent).toContain("IT-12345"); expect(sent).toContain(question.binding.decision_id); expect(sent).toContain("agent-decisions");
+  expect(sent).not.toContain("Hosszú kérdés"); expect(sent).not.toContain("Javaslat");
+});
+it("a tab neve az átbeszélt story azonosítója, újrahasználatkor is az aktuálisé", async () => {
+  const fixture = setup();
+  await fixture.service.open(question, "page");
+  await fixture.service.open({ ...other, story: "IT-2" }, "page");
+  expect(fixture.labels).toEqual(["Döntés: IT-1", "Döntés: IT-2"]);
 });
