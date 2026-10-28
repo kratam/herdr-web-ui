@@ -29,15 +29,20 @@ kérdés nyitva marad; hibánál a beírt szöveg megmarad. Nincs automatikus k�
 újrapróbálás. Változatlan szöveg és döntéskötés kézi újraküldése ugyanazt az
 idempotens kérést ellenőrzi. Mentés után a közös áttekintő cache érvénytelenedik.
 
-A **Beszéljük át** ugyanazt a **Döntések átbeszélése** Herdr-tabot használja, a
-`gg-agent-skills` konfigurált fő checkoutjában. Első kattintásra friss, ismert heti
+A **Beszéljük át** repónként egy **Döntések átbeszélése** Herdr-tabot használ: a
+döntés taskjának első, helyben konfigurált repójában (annak workspace-ében: ahol
+a fő checkoutban áll pane, különben az azonos nevű workspace-ben), ennek híján a
+`gg-agent-skills` fő checkoutjában. Első kattintásra friss, ismert heti
 kerettel rendelkező normál agent indul; a meglévő beszélgetés nem vált modellt.
 A választás csak az indítandó CLI konfigurált profiljának mérését használja,
 nem a kijelzőn megjelenő többi fiókét. Ugyanazt a nem titkos profilútvonalat
-adja át az új tab környezetében; globális konfigurációt nem módosít. Hiányzó
+adja át az új tab környezetében (alapprofilnál semmilyen `CLAUDE_CONFIG_DIR`-t:
+az üres értéket a Claude a munkakönyvtárnak venné); globális konfigurációt nem módosít. Hiányzó
 vagy nem mért elsődleges profil helyett egy tartalék fiók kerete nem használható.
-A kontextust az Ovis meglévő, a böngésző és a futó session azonosságához kötött
-üzenetsora adja át. A tényleges emberi választ az agent-decisions skill kezeli.
+Új tabnál a döntés kontextusa egysoros kezdő üzenetként az indítás része, így nem
+függ attól, mikor ismeri fel a Herdr az agentet (az `agent.start` azonnal visszatér,
+a felismerés kb. 1 mp). Meglévő tabnál az Ovis böngésző- és sessionazonossághoz
+kötött üzenetsora adja át. A tényleges emberi választ az agent-decisions skill kezeli.
 Interaktív koordinátorok saját kérdései továbbra is a saját beszélgetésükben maradnak.
 
 A privát `gg-discussion.json` csak a saját tab/terminál/PID/session kötését és a

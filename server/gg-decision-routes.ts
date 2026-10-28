@@ -1,5 +1,5 @@
 import type { GgDecisionService } from "./gg-decisions.ts";
-import type { GgDiscussionService } from "./gg-discussion.ts";
+import { DEFAULT_DISCUSSION_REPOSITORY, discussionRepository, type GgDiscussionService } from "./gg-discussion.ts";
 import type { GgOverviewService } from "./gg-overview.ts";
 import { jsonResponse } from "./http.ts";
 import { readCappedJson } from "./remote-json.ts";
@@ -47,7 +47,9 @@ export async function handleGgDecisionRequest(request: Request, allowed: boolean
     }
     if (typeof body.story !== "string" || typeof body.connection !== "string" || !body.connection || body.connection.length > 200) return fail("invalid_body", "Az átbeszéléshez élő böngészőkapcsolat szükséges.", 400);
     const detail = await decisions.detail(id!, body.story);
-    return reply(await discussion.open(detail, body.connection));
+    // A tab a story repójának workspace-ében nyílik; olvasási hibánál a gg-agent-skills marad.
+    const repository = await overview.read().then(feed => discussionRepository(feed, detail.binding.task_id), () => DEFAULT_DISCUSSION_REPOSITORY);
+    return reply(await discussion.open(detail, body.connection, repository));
   } catch (error) {
     const code = error instanceof Error ? error.message : "";
     if (["invalid_reply", "invalid_decision"].includes(code)) return fail(code, "A döntés vagy a válasz adata nem értelmezhető. Olvasd újra a kérdést.", 400);

@@ -2,28 +2,32 @@ import { afterEach, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GgDiscussionService, selectDiscussionAgent, type DiscussionIdentity } from "./gg-discussion.ts";
+import { DEFAULT_DISCUSSION_REPOSITORY, discussionLaunchArgs, discussionWorkspace, discussionRepository, GgDiscussionService, selectDiscussionAgent, type DiscussionAgent, type DiscussionIdentity } from "./gg-discussion.ts";
+import { writeFileSync } from "node:fs";
 import type { GgDecisionDetail } from "../shared/gg-decisions.ts";
 import { PendingInputError } from "./pending-input.ts";
 import { AGENT_NAME_PATTERN } from "../shared/agent-name.ts";
+import { launchArgsFault, MAX_FIRST_MESSAGE_CHARS } from "../shared/launch-rules.ts";
 
 const roots: string[] = [];
 afterEach(() => { for (const path of roots.splice(0)) rmSync(path, { recursive: true, force: true }); });
 const question: GgDecisionDetail = { binding: { decision_id: "e604002f-2993-4675-9c68-4808a010f808", task_id: "01e66a97-c5de-4526-aad8-3d996843d693", expected_epoch: 2, expected_source_revision: "a".repeat(64) },
   question_key: "CORE-TEST", story: "IT-1", text: "A kép látszódjon?", state: "pending", response_type: "boolean", choices: [], proposal: "Igen", rationale: null, risk: null, plans: [], blocked_reason: null };
+const other: GgDecisionDetail = { ...question, binding: { ...question.binding, decision_id: "e604002f-2993-4675-9c68-4808a010f809" } };
 const identity: DiscussionIdentity = { pane_id: "w1:p3", terminal_id: "terminal-owned", agent: "claude", name: "gg-decisions", process_pid: 100, process_birth: 200, session: "session-owned" };
 function setup() {
   const root = mkdtempSync(join(tmpdir(), "ovis-decision-test-")); roots.push(root);
   let live: DiscussionIdentity | null = null, creates = 0, starts = 0;
-  const prompts: string[] = [], names: string[] = [];
+  const prompts: string[] = [], names: string[] = [], queued: string[] = [], repositories: string[] = [];
   const deps = {
-    inspect: async () => live,
-    create: async () => { creates++; return { pane_id: identity.pane_id, terminal_id: identity.terminal_id }; },
-    choose: async () => ({ kind: "claude" as const, args: ["--model", "sonnet"], env: { CLAUDE_CONFIG_DIR: "" } }),
-    start: async (_pane: string, _choice: unknown, name: string) => { starts++; names.push(name); live = { ...identity, name }; return true; },
-    queue: async (_pane: string, prompt: string) => { prompts.push(prompt); return true; },
+    inspect: async (_pane: string) => live,
+    create: async (_agent: unknown, repository: string) => { creates++; repositories.push(repository); return { pane_id: identity.pane_id, terminal_id: identity.terminal_id }; },
+    choose: async (): Promise<DiscussionAgent> => ({ kind: "claude", args: ["--model", "sonnet"], env: {} }),
+    start: async (_pane: string, _choice: unknown, name: string, prompt: string) => { starts++; names.push(name); prompts.push(prompt); live = { ...identity, name }; return true; },
+    queue: async (_pane: string, prompt: string) => { prompts.push(prompt); queued.push(prompt); return true; },
+    wait: async () => {},
   };
-  return { root, deps, service: new GgDiscussionService(root, deps), prompts, names, stats: () => ({ creates, starts }), replace: (next: DiscussionIdentity | null) => { live = next; } };
+  return { root, deps, service: new GgDiscussionService(root, deps), prompts, names, queued, repositories, stats: () => ({ creates, starts }), replace: (next: DiscussionIdentity | null) => { live = next; } };
 }
 it("két egyidejű kattintás egy tabot és egy döntési üzenetet hoz létre, újraindítás után is ugyanazt használja", async () => {
   const fixture = setup();
@@ -45,12 +49,12 @@ it("lecserélt folyamatnak nem küld kontextust, bezárt pane után viszont új 
   expect(fixture.stats().creates).toBe(2);
 });
 it("bizonytalan üzenetsorba adást nem ismétel automatikusan", async () => {
-  const fixture = setup();
+  const fixture = setup(); await fixture.service.open(question, "page");
   fixture.deps.queue = async () => { throw Error("connection lost"); };
-  const a = await fixture.service.open(question, "page");
+  const a = await fixture.service.open(other, "page");
   expect(a.queued).toBeFalse(); expect(a.error).toBe("discussion_delivery_unconfirmed");
   fixture.deps.queue = async () => { throw Error("must not retry"); };
-  const b = await fixture.service.open(question, "page");
+  const b = await fixture.service.open(other, "page");
   expect(b.error).toBe("discussion_delivery_unconfirmed"); expect(fixture.stats()).toEqual({ creates: 1, starts: 1 });
 });
 it("az induláshoz a tényleges heti keretet nézi; elfogyott vagy nem mért keretből nem választ", () => {
@@ -68,11 +72,11 @@ it("Ovis-újraindítás után nem állítja kézbesítettnek a régi memóriabel
   expect(fixture.prompts).toHaveLength(1);
 });
 it("a bizonyítottan megtelt üzenetsor után későbbi kézi kérés újrapróbálható, új tab nélkül", async () => {
-  const fixture = setup();
+  const fixture = setup(); await fixture.service.open(question, "page");
   fixture.deps.queue = async () => { throw new PendingInputError("pending_limit", "full"); };
-  const held = await fixture.service.open(question, "page"); expect(held.error).toBe("discussion_queue_full");
+  const held = await fixture.service.open(other, "page"); expect(held.error).toBe("discussion_queue_full");
   fixture.deps.queue = async () => true;
-  expect((await fixture.service.open(question, "page")).queued).toBeTrue(); expect(fixture.stats().creates).toBe(1);
+  expect((await fixture.service.open(other, "page")).queued).toBeTrue(); expect(fixture.stats().creates).toBe(1);
 });
 it("hiányzó mapping javítása után indulhat; egyszeri indulás utáni olvasóhibából ugyanazt a sessiont állítja helyre", async () => {
   const fixture = setup(), create = fixture.deps.create, inspect = fixture.deps.inspect;
@@ -80,10 +84,11 @@ it("hiányzó mapping javítása után indulhat; egyszeri indulás utáni olvas�
   await expect(fixture.service.open(question, "page")).rejects.toThrow("discussion_workspace_missing");
   fixture.deps.create = create;
   fixture.deps.inspect = async () => { throw Error("temporary rpc failure"); };
-  const first = await fixture.service.open(question, "page"); expect(first.error).toBe("discussion_start_unconfirmed");
+  // a kontextus a kezdő üzenetben már bement, ezért a késő azonosítás nem jelent elveszett üzenetet
+  const first = await fixture.service.open(question, "page"); expect(first.queued).toBeTrue(); expect(first.error).toBeUndefined();
   fixture.deps.inspect = inspect;
-  const recovered = await fixture.service.open(question, "page"); expect(recovered.queued).toBeTrue();
-  expect(fixture.stats()).toEqual({ creates: 1, starts: 1 }); expect(fixture.prompts).toHaveLength(1);
+  const recovered = await fixture.service.open(other, "page"); expect(recovered.queued).toBeTrue();
+  expect(fixture.stats()).toEqual({ creates: 1, starts: 1 }); expect(fixture.prompts).toHaveLength(2);
 });
 it("az igazolt profil környezetét adja tovább, és kimerült profilt nem választ", async () => {
   const now = Date.now(), checked_at = new Date(now).toISOString();
@@ -95,7 +100,102 @@ it("az igazolt profil környezetét adja tovább, és kimerült profilt nem vál
   const fixture = setup();
   const environments: Record<string, string>[] = [];
   const create = fixture.deps.create;
-  const service = new GgDiscussionService(fixture.root, { ...fixture.deps, choose: async () => agent, create: async selected => { environments.push(selected.env); return create(); } });
+  const service = new GgDiscussionService(fixture.root, { ...fixture.deps, choose: async () => agent, create: async (selected, repository) => { environments.push(selected.env); return create(selected, repository); } });
   await service.open(question, "page");
   expect(environments).toEqual([profile.env]);
+});
+it("új tabnál a döntés kontextusa egysoros kezdő üzenetként indul, üzenetsor nélkül", async () => {
+  const fixture = setup(); const result = await fixture.service.open(question, "page");
+  expect(result).toEqual({ pane_id: identity.pane_id, agent_started: true, queued: true });
+  expect(fixture.queued).toHaveLength(0); expect(fixture.prompts[0]).not.toMatch(/[\n\r\t]/);
+  expect(fixture.prompts[0]).toContain("A kép látszódjon?");
+});
+it("a Herdr késői felismerését kivárja, mielőtt a tabot a sajátjának igazolja", async () => {
+  const fixture = setup(), inspect = fixture.deps.inspect; let calls = 0;
+  fixture.deps.inspect = async (pane: string) => { calls++; if (calls < 3) throw Error("discussion_identity_unavailable"); return inspect(pane); };
+  await fixture.service.open(question, "page");
+  fixture.deps.inspect = inspect;
+  expect((await fixture.service.open(other, "page")).queued).toBeTrue(); expect(fixture.queued).toHaveLength(1);
+});
+it("a story repójának workspace-ében nyit, és repónként egy tabot használ újra", async () => {
+  const fixture = setup();
+  await fixture.service.open(question, "page", "GuestGuru/gg3-app");
+  await fixture.service.open(other, "page", "GuestGuru/gg3-app");
+  expect(fixture.repositories).toEqual(["GuestGuru/gg3-app"]);
+  await fixture.service.open(question, "page", DEFAULT_DISCUSSION_REPOSITORY);
+  expect(fixture.repositories).toEqual(["GuestGuru/gg3-app", DEFAULT_DISCUSSION_REPOSITORY]);
+});
+it("a régi, egytabos állapotfájlt a gg-agent-skills tabjaként olvassa tovább", async () => {
+  const fixture = setup();
+  writeFileSync(join(fixture.root, "gg-discussion.json"), JSON.stringify({ version: 1, phase: "running", name: "gg-decisions", agent: "claude", pane: { pane_id: identity.pane_id, terminal_id: identity.terminal_id }, identity, delivered: [], delivering: null }));
+  fixture.replace(identity);
+  expect((await fixture.service.open(question, "page")).queued).toBeTrue();
+  expect(fixture.stats().creates).toBe(0); expect(fixture.queued).toHaveLength(1);
+});
+it("a kezdő üzenet a Claude-nál utolsó argumentum, a Codexnél a -- után áll", () => {
+  expect(discussionLaunchArgs({ kind: "claude", args: ["--model", "sonnet"], env: {} }, "szia")).toEqual(["--model", "sonnet", "szia"]);
+  expect(discussionLaunchArgs({ kind: "codex", args: ["-m", "x"], env: {} }, "szia")).toEqual(["-m", "x", "--", "szia"]);
+});
+it("a task első helyben elérhető repóját választja, különben a gg-agent-skills-t", () => {
+  const repos = [{ repository: "GuestGuru/gg3-app", label: "gg3-app", path: "/x/gg3-app" }, { repository: "GuestGuru/nopath", label: "nopath", path: null }];
+  const tasks = [{ id: "t1", repositories: ["GuestGuru/nopath", "GuestGuru/gg3-app"] }, { id: "t2", repositories: ["GuestGuru/nopath"] }];
+  expect(discussionRepository({ tasks, repositories: repos }, "t1")).toBe("GuestGuru/gg3-app");
+  expect(discussionRepository({ tasks, repositories: repos }, "t2")).toBe(DEFAULT_DISCUSSION_REPOSITORY);
+  expect(discussionRepository({ tasks, repositories: repos }, "missing")).toBe(DEFAULT_DISCUSSION_REPOSITORY);
+});
+it("a repó workspace-ét a fő checkout pane-jéről, ennek híján a workspace nevéről ismeri fel", () => {
+  const workspaces = [{ workspace_id: "w1", label: "gg3-app" }, { workspace_id: "w2", label: "gg-agent-skills" }];
+  expect(discussionWorkspace({ panes: [{ workspace_id: "w2", cwd: "/x/gg3-app" }], workspaces }, "/x/gg3-app", "gg3-app")).toBe("w2");
+  expect(discussionWorkspace({ panes: [{ workspace_id: "w1", cwd: "/wt/gg3-app-feature" }], workspaces }, "/x/gg3-app", "gg3-app")).toBe("w1");
+  expect(discussionWorkspace({ panes: [], workspaces }, "/x/other", "other")).toBeNull();
+});
+it("elveszett indítási nyugta után a ténylegesen elindult saját agentet később igazolja, az első üzenetet nem küldi újra", async () => {
+  const fixture = setup(), start = fixture.deps.start;
+  fixture.deps.start = async (...args: Parameters<typeof start>) => { await start(...args); throw Error("rpc reply lost"); };
+  expect((await fixture.service.open(question, "page")).error).toBe("discussion_start_unconfirmed");
+  fixture.deps.start = start;
+  expect((await fixture.service.open(other, "page")).queued).toBeTrue();
+  expect((await fixture.service.open(question, "page")).error).toBe("discussion_delivery_unconfirmed");
+  expect(fixture.stats()).toEqual({ creates: 1, starts: 1 }); expect(fixture.queued).toHaveLength(1);
+});
+it("a core-ból jövő szöveg vezérlőkarakterei és túlhossza nem jut az indítási argumentumba", async () => {
+  const fixture = setup();
+  await fixture.service.open({ ...question, text: "a\u007fb\u0085c\u009bd" + "x".repeat(30_000) }, "page");
+  const sent = fixture.prompts[0]!;
+  expect(launchArgsFault("claude", discussionLaunchArgs({ kind: "claude", args: [], env: {} }, sent))).toBeNull();
+  expect(sent.length).toBeLessThanOrEqual(MAX_FIRST_MESSAGE_CHARS);
+});
+it("valóban elbukott indítás után ugyanabban a pane-ben újraindít, új tab nélkül", async () => {
+  const fixture = setup(), start = fixture.deps.start, inspect = fixture.deps.inspect;
+  fixture.deps.start = async () => false;
+  fixture.deps.inspect = async () => { throw Error("discussion_identity_unavailable"); };
+  expect((await fixture.service.open(question, "page")).error).toBe("discussion_start_unconfirmed");
+  fixture.deps.start = start;
+  const retried = fixture.deps.inspect; let first = true;
+  fixture.deps.inspect = async (pane: string) => { if (first) { first = false; return retried(pane); } return inspect(pane); };
+  expect(await fixture.service.open(question, "page")).toEqual({ pane_id: identity.pane_id, agent_started: true, queued: true });
+  expect(fixture.stats()).toEqual({ creates: 1, starts: 1 });
+  expect((await fixture.service.open(question, "page")).queued).toBeTrue(); expect(fixture.queued).toHaveLength(0);
+});
+it("bizonytalan azonosításnál nem nyit új tabot a még futó agent mellé", async () => {
+  const fixture = setup();
+  fixture.deps.start = async () => false;
+  expect((await fixture.service.open(question, "page")).error).toBe("discussion_start_unconfirmed");
+  fixture.deps.inspect = async () => { throw Error("temporary rpc failure"); };
+  await expect(fixture.service.open(other, "page")).rejects.toThrow("temporary rpc failure");
+  fixture.deps.inspect = async () => { throw Error("discussion_identity_unavailable"); };
+  fixture.deps.choose = async () => ({ kind: "codex" as const, args: [], env: {} });
+  expect((await fixture.service.open(other, "page")).error).toBe("discussion_start_unconfirmed");
+  expect(fixture.stats().creates).toBe(1);
+});
+it("elutasított újraindítás után a korábbi bizonytalan döntést sem küldi újra", async () => {
+  const fixture = setup(), start = fixture.deps.start, inspect = fixture.deps.inspect;
+  fixture.deps.start = async (...args: Parameters<typeof start>) => { await start(...args); throw Error("rpc reply lost"); };
+  await fixture.service.open(question, "page");
+  fixture.deps.inspect = async () => { throw Error("discussion_identity_unavailable"); };
+  fixture.deps.start = async () => false;
+  expect((await fixture.service.open(other, "page")).error).toBe("discussion_start_unconfirmed");
+  fixture.deps.inspect = inspect;
+  expect((await fixture.service.open(question, "page")).error).toBe("discussion_delivery_unconfirmed");
+  expect(fixture.queued).toHaveLength(0);
 });
