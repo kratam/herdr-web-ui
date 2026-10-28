@@ -188,3 +188,14 @@ it("bizonytalan azonosításnál nem nyit új tabot a még futó agent mellé", 
   expect((await fixture.service.open(other, "page")).error).toBe("discussion_start_unconfirmed");
   expect(fixture.stats().creates).toBe(1);
 });
+it("elutasított újraindítás után a korábbi bizonytalan döntést sem küldi újra", async () => {
+  const fixture = setup(), start = fixture.deps.start, inspect = fixture.deps.inspect;
+  fixture.deps.start = async (...args: Parameters<typeof start>) => { await start(...args); throw Error("rpc reply lost"); };
+  await fixture.service.open(question, "page");
+  fixture.deps.inspect = async () => { throw Error("discussion_identity_unavailable"); };
+  fixture.deps.start = async () => false;
+  expect((await fixture.service.open(other, "page")).error).toBe("discussion_start_unconfirmed");
+  fixture.deps.inspect = inspect;
+  expect((await fixture.service.open(question, "page")).error).toBe("discussion_delivery_unconfirmed");
+  expect(fixture.queued).toHaveLength(0);
+});

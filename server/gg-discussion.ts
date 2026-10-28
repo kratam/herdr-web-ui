@@ -120,6 +120,8 @@ export class GgDiscussionService {
       tab.delivered.push({ key, instance: UNCONFIRMED_START, queued: false }); this.save(state);
       return { pane_id: pane.pane_id, agent_started: false, queued: false, error: "discussion_start_unconfirmed" };
     }
+    // A sikeres indítás igazolja, hogy a pane üres volt: a korábbi bizonytalan indítások nem futottak le.
+    tab.delivered = tab.delivered.filter(item => item.instance !== UNCONFIRMED_START);
     // A kontextus a kezdő üzenettel már bement; a tab igazolása ettől függetlenül pótolható.
     tab.delivered.push({ key, instance: this.instance, queued: true }); tab.phase = "binding"; this.save(state);
     try {
@@ -152,7 +154,6 @@ export class GgDiscussionService {
         if (tab.phase !== "starting" || !(error instanceof Error) || error.message !== "discussion_identity_unavailable") throw error;
         const agent = await this.deps.choose();
         if (agent.kind !== tab.agent) return { pane_id: tab.pane.pane_id, agent_started: false, queued: false, error: "discussion_start_unconfirmed" };
-        tab.delivered = tab.delivered.filter(item => item.instance !== UNCONFIRMED_START);
         return this.launch(state, tab, tab.pane, agent, detail, key);
       }
       if (!live) { delete state.tabs[repository]; tab = null; }
