@@ -45,7 +45,18 @@ export interface GgAssessment {
   if_no?: string;
   context?: GgAssessmentContextSection[];
 }
+/** A gg-mb óránkénti forrás-ellenőrzése (intake): brief-változás taskonként, forrás-parkolás storynként. */
+export interface GgSourceChecks {
+  brief_changed: Record<string, { changed_at: string | null }>;
+  parked: Record<string, { reason: string; blockers: { identifier: string; title: string | null }[] }>;
+}
+/** megőrzött (elavult briefre adott) válasz */
+export interface GgPreservedAnswer { raw_text: string; recorded_at: string | null }
 export interface GgAssessmentFeed {
+  /** null: az intake most nem friss vagy nem olvasható, ilyenkor nem jelölünk */
+  source_checks?: GgSourceChecks | null;
+  /** döntés-azonosító → megőrzött válaszok */
+  preserved?: Record<string, GgPreservedAnswer[]>;
   tasks: Record<string, GgAssessment>;
   decisions: Record<string, GgAssessment>;
   /** story-azonosító → story-cím */

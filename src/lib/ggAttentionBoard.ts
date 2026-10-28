@@ -1,9 +1,11 @@
-import type { GgAssessment, GgDecision, GgOverview, GgTask } from "../../shared/gg-overview.ts";
+import type { GgAssessment, GgDecision, GgOverview, GgPreservedAnswer, GgSourceChecks, GgTask } from "../../shared/gg-overview.ts";
 import { isGgSnoozed } from "./ggTaskAttention.ts";
 
 export interface StoryRow { story: string | null; title: string; tasks: GgTask[]; next: string; meta: string; assessment: GgAssessment | null; age_days: number | null }
 // döntésenkénti felmérés (decision_id → felmérés); a fejléc kockázata csak egyetlen döntésnél egyértelmű
-export interface DecisionPackage { story: string | null; title: string; decisions: GgDecision[]; tasks: GgTask[]; assessments: Record<string, GgAssessment>; risk: { score: number; explanation: string } | null }
+// brief_changed: döntés → mióta tér el a task briefje (2. fázis); preserved: döntés → megőrzött válaszok
+export interface DecisionPackage { story: string | null; title: string; decisions: GgDecision[]; tasks: GgTask[]; assessments: Record<string, GgAssessment>; risk: { score: number; explanation: string } | null;
+  brief_changed: Record<string, string | null>; preserved: Record<string, GgPreservedAnswer[]> }
 export interface AttentionBoard { decisions: DecisionPackage[]; stuck: StoryRow[]; soon: StoryRow[]; parked: StoryRow[]; cleanup: StoryRow[]; running: StoryRow[] }
 
 // a migrációs import minden régi taskon ott van; önmagában nem mond semmit, nem mutatjuk
@@ -18,8 +20,24 @@ const day = (iso: string) => new Date(iso).toLocaleDateString("hu-HU");
 /** Olvasható okok; az ismeretlen kódot jelölve megtartjuk, nem rejtjük el. */
 export const reasonLabels = (reason: string | null): string[] => (reason ?? "").split(",").map(code => code.trim()).filter(code => code && code !== MIGRATION).map(code => REASON_LABELS[code] ?? "egyéb ok: " + code);
 
+/** A gg-mb forrás-ellenőrzés szerinti parkolás olvasható oka (Linear-címke, mérföldkő, On Hold, blocked-by). */
+function sourceParkedLabel(parked: GgSourceChecks["parked"][string]): string {
+  const reason = parked.reason;
+  if (reason === "parking") return "Parkol: kézzel parkoltatva (parking címke)";
+  if (reason.startsWith("after:")) return "Parkol, amíg: a(z) " + reason.slice(6) + " mérföldkő teljesül";
+  if (reason === "on_hold") return "Parkol, amíg: a projekt On Hold";
+  if (reason.startsWith("blocked_by:")) {
+    const names = parked.blockers.length ? parked.blockers.map(blocker => blocker.title ? blocker.identifier + " " + blocker.title : blocker.identifier)
+      : reason.slice(11).split(",").filter(id => /^[A-Z][A-Z0-9]*-\d+$/.test(id));
+    return names.length ? "Parkol, amíg: lezárul: " + names.join(", ") : "Parkol, amíg: a blokkolók lezárulnak (a lista hiányos)";
+  }
+  return "Parkol: " + reason;
+}
+
 /** A forrásból jövő parkolás feloldási feltétele; nincs parkolás: null. A later nem parkolás. */
-function parkedBecause(task: GgTask, now: number): string | null {
+function parkedBecause(task: GgTask, now: number, checks?: GgSourceChecks | null): string | null {
+  const source = task.story ? checks?.parked[task.story] : undefined;
+  if (source) return sourceParkedLabel(source);
   const list = reasons(task);
   if (list.includes("after_gg3_launch")) return "Parkol, amíg: a GG3-indulás után";
   if (list.some(reason => reason.startsWith("after_"))) return "Parkol, amíg: egy mérföldkő teljesül";
@@ -42,6 +60,7 @@ function byStory(tasks: GgTask[]): GgTask[][] {
 /** Az Áttekintés teendő-szerinti besorolása: mi vár Tamásra most, mi kerül hozzá hamarosan, és mivel nincs dolga. */
 export function buildAttentionBoard(feed: GgOverview, now: number): AttentionBoard {
   const stories = feed.assessments?.stories ?? {};
+  const checks = feed.assessments?.source_checks ?? null;
   const taskAssessment = (task: GgTask) => feed.assessments?.tasks[task.id] ?? null;
   // egy story minden során ugyanaz a cím: a story-cím, ennek hiányában a story első taskjáé
   const title = (tasks: GgTask[]) => { const story = tasks[0]!.story; return (story ? stories[story] ?? feed.tasks.find(task => task.story === story)?.title : undefined) ?? tasks[0]!.title; };
@@ -64,7 +83,14 @@ export function buildAttentionBoard(feed: GgOverview, now: number): AttentionBoa
     for (const decision of list) { const value = feed.assessments?.decisions[decision.id]; if (value?.freshness === "current") assessments[decision.id] = value; }
     const only = list.length === 1 ? list[0]! : null;
     const risk = only ? only.risk ?? assessments[only.id]?.risk ?? null : null;
-    return { story, title: (story ? stories[story] : undefined) ?? tasks[0]?.title ?? list[0]!.text, decisions: list, tasks, assessments, risk };
+    const brief_changed: Record<string, string | null> = {}, preserved: Record<string, GgPreservedAnswer[]> = {};
+    for (const decision of list) {
+      const changed = checks?.brief_changed[decision.task_id];
+      if (changed) brief_changed[decision.id] = changed.changed_at;
+      const kept = feed.assessments?.preserved?.[decision.id];
+      if (kept?.length) preserved[decision.id] = kept;
+    }
+    return { story, title: (story ? stories[story] : undefined) ?? tasks[0]?.title ?? list[0]!.text, decisions: list, tasks, assessments, risk, brief_changed, preserved };
   });
 
   const rank = (tasks: GgTask[]) => Math.min(...tasks.map(task => task.priority || 5));
@@ -77,8 +103,8 @@ export function buildAttentionBoard(feed: GgOverview, now: number): AttentionBoa
   }).sort((a, b) => rank(a.tasks) - rank(b.tasks) || (a.story ?? "").localeCompare(b.story ?? ""));
 
   const planned = feed.tasks.filter(task => task.state === "planned" && !decisionTasks.has(task.id));
-  const parked = byStory(planned.filter(task => parkedBecause(task, now) !== null)).map(tasks => row(tasks, parkedBecause(tasks[0]!, now)!, tasks.length > 1 ? tasks.length + " task" : "", null));
-  const rest = planned.filter(task => parkedBecause(task, now) === null);
+  const parked = byStory(planned.filter(task => parkedBecause(task, now, checks) !== null)).map(tasks => row(tasks, parkedBecause(tasks[0]!, now, checks)!, tasks.length > 1 ? tasks.length + " task" : "", null));
+  const rest = planned.filter(task => parkedBecause(task, now, checks) === null);
   const isCleanup = (task: GgTask) => { const value = taskAssessment(task); return value?.freshness === "current" && CLEANUP.includes(value.preparation ?? ""); };
   const cleanup = byStory(rest.filter(isCleanup)).map(tasks => row(tasks, "az agent ellenőrzi a kész-feltételt, és lezárást javasol", "", taskAssessment(tasks[0]!)));
 

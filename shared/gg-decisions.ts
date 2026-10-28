@@ -23,5 +23,6 @@ export interface GgDecisionDetail {
   blocked_reason: "expired_plan" | "decision_closed" | null;
 }
 export interface GgDecisionReply { binding: GgDecisionBinding; request_key: string; raw_text: string }
-export interface GgDecisionReceipt { decision_id: string; response_id: string; answer_processing: "answered" | "ambiguous" }
+/** preserved: a task briefje a döntés óta változott; a válasz megmaradt, a brief frissítése után érvényesül */
+export interface GgDecisionReceipt { decision_id: string; response_id: string; answer_processing: "answered" | "ambiguous" | "preserved" }
 export interface GgDiscussionReceipt { pane_id: string; agent_started: boolean; queued: boolean; error?: string }

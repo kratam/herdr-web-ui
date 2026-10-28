@@ -115,6 +115,8 @@
 .gg-package-body { display: grid; gap: var(--space-4); min-width: 0; }
 .gg-package-body + .gg-package-body { padding-top: var(--space-4); border-top: 1px solid var(--border); }
 .gg-package-situation { margin: 0; font-size: var(--fs-chat); line-height: 1.5; overflow-wrap: anywhere; }
+/* a feladat leírása a kérdés óta változott, vagy megőrzött válasz: halk, de a kérdés alatt látható jelzés */
+.gg-package-notice { margin: 0; padding: var(--space-2) var(--space-3); background: var(--bg-elevated); border-left: 3px solid var(--border-strong); border-radius: var(--radius-sm); line-height: 1.5; overflow-wrap: anywhere; }
 .gg-package-question { margin: 0; padding: var(--space-3) var(--space-4); background: var(--bg); border-radius: var(--radius-sm); font-size: var(--fs-chat); font-weight: var(--fw-medium); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .gg-package-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3) var(--space-5); }
 .gg-package-facts h4, .gg-background h4 { color: var(--text-dim); font-size: var(--fs-xs); font-weight: var(--fw-medium); margin-bottom: var(--space-1); }

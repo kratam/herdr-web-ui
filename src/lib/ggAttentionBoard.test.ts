@@ -102,3 +102,23 @@ describe("Áttekintés-besorolás", () => {
     expect(texts.join(" ")).not.toContain(MIGRATION);
   });
 });
+
+describe("Áttekintés forrás-ellenőrzéssel (2. fázis)", () => {
+  const checks = (source_checks: unknown) => ({ ...assessments({}), source_checks } as never);
+  it("a forrásból parkolt story a Parkolt csoportba kerül, a blokkoló nevével", () => {
+    const board = buildAttentionBoard(feed([task("a")], { assessments: checks({ brief_changed: {}, parked: { "IT-1": { reason: "blocked_by:IT-9", blockers: [{ identifier: "IT-9", title: "Előfeltétel" }] } } }) }), NOW);
+    expect(board.parked[0]?.next).toBe("Parkol, amíg: lezárul: IT-9 Előfeltétel");
+    expect(board.soon).toHaveLength(0);
+  });
+  it("a parking címke és a mérföldkő olvasható okot kap", () => {
+    const label = (reason: string) => buildAttentionBoard(feed([task("a")], { assessments: checks({ brief_changed: {}, parked: { "IT-1": { reason, blockers: [] } } }) }), NOW).parked[0]?.next;
+    expect(label("parking")).toBe("Parkol: kézzel parkoltatva (parking címke)");
+    expect(label("after:gg3-launch")).toBe("Parkol, amíg: a(z) gg3-launch mérföldkő teljesül");
+    expect(label("on_hold")).toBe("Parkol, amíg: a projekt On Hold");
+  });
+  it("a döntési csomag jelzi, ha a döntés taskjának briefje azóta változott", () => {
+    const decision = { id: "d1", task_id: "a", text: "Kérdés?", proposal: null, url: null, story: "IT-1" };
+    const board = buildAttentionBoard(feed([task("a", { state: "waiting" })], { decisions: [decision], assessments: checks({ brief_changed: { a: { changed_at: "2026-10-26T15:18:24Z" } }, parked: {} }) }), NOW);
+    expect(board.decisions[0]?.brief_changed).toEqual({ d1: "2026-10-26T15:18:24Z" });
+  });
+});
