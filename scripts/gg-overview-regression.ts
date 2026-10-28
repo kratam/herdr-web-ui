@@ -73,7 +73,7 @@ try {
   assert.equal(await firstTab.getAttribute("aria-selected"), "true");
   await page.getByText("Melyik irány legyen?", { exact: true }).click();
   await page.getByText("Az egyszerűbb megoldás.", { exact: false }).waitFor();
-  await page.keyboard.press("Meta+Shift+K");
+  await page.keyboard.press("ControlOrMeta+Shift+K");
   await page.getByRole("dialog", { name: "Command palette", exact: true }).waitFor();
   await page.keyboard.press("Escape");
   await page.setViewportSize({ width: 740, height: 500 });
@@ -95,9 +95,9 @@ try {
   const rowB = page.locator(`.workspace-select[data-pane="${paneB}"]`);
   await rowB.click(); await rowA.click();
   assert.equal(await page.getByRole("tab").first().getAttribute("aria-selected"), "false");
-  await page.keyboard.press("Meta+Shift+ArrowUp");
+  await page.keyboard.press("ControlOrMeta+Shift+ArrowUp");
   await page.getByRole("heading", { name: prefix, exact: true }).waitFor();
-  await page.keyboard.press("Meta+Shift+ArrowDown");
+  await page.keyboard.press("ControlOrMeta+Shift+ArrowDown");
   await page.getByRole("heading", { name: prefix, exact: true }).waitFor({ state: "hidden" });
   assert.equal(await page.getByRole("tab").nth(1).getAttribute("aria-selected"), "true");
   await page.getByRole("tab").first().click();
