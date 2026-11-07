@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowUpRight, RefreshCw, Terminal } from "lucide-react";
+import { ArrowUpRight, ChevronDown, RefreshCw, Terminal } from "lucide-react";
 import type { GgOverviewFeed } from "../lib/ggOverviewFeed.ts";
 import { copyText } from "../lib/clipboard.ts";
 import { openGgIssueTab } from "../lib/ggIssueTab.ts";
@@ -157,12 +157,16 @@ export function GgOverviewPanel({ target, cache, machines, onWorkspace, onPane, 
 }
 
 /** A fejléc címe az áttekintő alatt (az App a pane-morzsa helyett ezt mutatja). */
-export function GgOverviewTitle({ target }: { target: GgOverviewTarget }) {
-  return <div className="context"><div className="context-title"><span className="context-title-text">{target.workspaceId === null ? "Globális áttekintés" : "Workspace-áttekintés"}</span></div></div>;
+export function GgOverviewTitle({ target, tabs }: { target: GgOverviewTarget; tabs?: { label: string; open: boolean; toggle(anchor: HTMLElement): void } }) {
+  // telefonon (upstream: nincs tabsor) a cím nyitja a workspace tablistáját, ahogy a pane-nézetben
+  const listed = tabs !== undefined && target.workspaceId !== null;
+  return <div className={`context${listed ? " has-tabs" : ""}`}><div className="context-title"><span className="context-title-text">{target.workspaceId === null ? "Globális áttekintés" : "Workspace-áttekintés"}</span>
+    {listed && <button type="button" className="context-tabs" aria-label={tabs.label} aria-haspopup="dialog" aria-expanded={tabs.open} onClick={(event) => tabs.toggle(event.currentTarget)}><ChevronDown aria-hidden="true" /></button>}
+  </div></div>;
 }
 
 /** Az áttekintő a pane-terület helyén: workspace-nézetben a workspace tabsorával együtt. */
-export function GgOverviewHost({ gg, machines, snapshot, selectedMachineId, selectedPane, selectedWorkspace, actions, load }: {
+export function GgOverviewHost({ gg, machines, snapshot, selectedMachineId, selectedPane, selectedWorkspace, actions, load, inHeader = false, sheet = null, onSheetClose }: {
   gg: GgOverview;
   machines: Machine[];
   snapshot: SessionSnapshot | null | undefined;
@@ -171,11 +175,15 @@ export function GgOverviewHost({ gg, machines, snapshot, selectedMachineId, sele
   selectedWorkspace: WorkspaceInfo | null;
   actions: AppActions;
   load(): unknown;
+  /** telefon: a tabokat a fejléc címe listázza (TabStrip `inHeader`/`sheet`) */
+  inHeader?: boolean;
+  sheet?: HTMLElement | null;
+  onSheetClose?: () => void;
 }) {
   const target = gg.target;
   if (target === null) return null;
   return <div className="gg-overview-host">
-    {target.workspaceId !== null && selectedPane && selectedWorkspace && selectedMachineId === target.machineId && selectedWorkspace.workspace_id === target.workspaceId && snapshot && <TabStrip snapshot={snapshot} workspace={selectedWorkspace} selectedPane={selectedPane} onSelectPane={gg.selectPane} onNewTab={() => actions.openNewTab()} onNewTerminal={() => actions.openTerminalTab()} overview={{ selected: true, onSelect: () => undefined }} />}
+    {target.workspaceId !== null && selectedPane && selectedWorkspace && selectedMachineId === target.machineId && selectedWorkspace.workspace_id === target.workspaceId && snapshot && <TabStrip snapshot={snapshot} workspace={selectedWorkspace} selectedPane={selectedPane} onSelectPane={gg.selectPane} onNewTab={() => actions.openNewTab()} onNewTerminal={() => actions.openTerminalTab()} overview={{ selected: true, onSelect: () => undefined }} inHeader={inHeader} sheet={sheet} onSheetClose={onSheetClose} />}
     <GgOverviewPanel cache={gg.feed} onAgentPane={(machineId, paneId, started) => { if (started) actions.agentStarted(machineId, paneId); gg.selectTarget(machineId, paneId); void load(); }} target={target} machines={machines} onPane={(machineId, paneId) => gg.selectTarget(machineId, paneId)} onWorkspace={(machineId, workspaceId, paneId) => { gg.selectTarget(machineId, paneId); gg.setTarget({ machineId, workspaceId }); void load(); }} onGlobal={() => gg.setTarget({ machineId: "local", workspaceId: null })} />
   </div>;
 }

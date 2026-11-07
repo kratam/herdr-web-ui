@@ -261,7 +261,7 @@ async function checkDesktop(browser: Browser, origin: string, first: string, sec
     await frame(page, first).locator(".xterm-helper-textarea").focus();
     await dragInactiveBeforeFirst();
     await until(async () => JSON.stringify(await order()) === JSON.stringify(movedOrder), "a drag changes native tab order");
-    assert.equal(await strip.getByRole("tab").first().textContent(), "Áttekintés", "the virtual overview stays before the reordered native tabs");
+    assert.equal(await strip.getByRole("tab").first().getAttribute("aria-label"), "Áttekintés", "the virtual overview stays before the reordered native tabs");
     assert.deepEqual((await sessionSnapshot()).tabs.filter((entry) => entry.workspace_id === nativeTab.workspace_id).map((entry) => entry.tab_id), movedOrder);
     await currentPane(page, first);
     assert.equal((await sessionSnapshot()).focused_pane_id, first, "dragging an inactive tab preserves native pane focus");

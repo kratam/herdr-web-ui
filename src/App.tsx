@@ -1041,7 +1041,7 @@ export function App() {
           </button>}
         </div>
         <HeaderNote note={herdrPrefixWaiting ? t("herdr prefix: press a key") : note} />
-        {gg.target !== null ? <GgOverviewTitle target={gg.target} /> : stripInHeader ? (
+        {gg.target !== null ? <GgOverviewTitle target={gg.target} tabs={tabsInHeader && selectedWorkspace && !guideShown ? { label: t("Tabs of {workspace}", { workspace: selectedWorkspace.label }), open: tabSheet !== null, toggle: toggleTabSheet } : undefined} /> : stripInHeader ? (
           <div className={`header-tabs${phoneTabRow ? " is-phone" : ""}`}>
             <RenderBoundary resetKey={`${selectedMachineId}:${selectedPane.pane_id}`} fallback={(retry) => <RegionCrash message={t("This pane can't be shown.")} retry={retry} />}>
             <PanePressContext.Provider value={pressPane}>
@@ -1240,7 +1240,7 @@ export function App() {
           onPaired={() => void loadHealth()}
           onOpened={(paneId, agentStarted) => { if (agentStarted) actions.agentStarted("local", paneId);
             if (agentStarted && setupGuide.guide?.reopened !== true) { try { armHints(window.localStorage); } catch {} } setupGuide.finish(() => selectTarget("local", paneId)); void load(); }} /></MachineContext.Provider>}
-        {guideShown ? null : gg.target !== null ? <GgOverviewHost gg={gg} machines={machines} snapshot={snapshot} selectedMachineId={selectedMachineId} selectedPane={selectedPane} selectedWorkspace={selectedWorkspace} actions={actions} load={load} />
+        {guideShown ? null : gg.target !== null ? <GgOverviewHost gg={gg} machines={machines} snapshot={snapshot} selectedMachineId={selectedMachineId} selectedPane={selectedPane} selectedWorkspace={selectedWorkspace} actions={actions} load={load} inHeader={tabsInHeader} sheet={tabSheet} onSheetClose={closeTabSheet} />
         : <div ref={paneAreaRef} className={`pane-split${paneSplit ? " is-split" : ""}${inbox.shown ? " is-under-inbox" : ""}`} onDragEnterCapture={paneDragOver} onDragOverCapture={paneDragOver} onDragLeave={paneDragLeave} onDropCapture={paneDrop}>
           {inboxWide && <ThreadTop note={<HeaderNote note={herdrPrefixWaiting ? t("herdr prefix: press a key") : note} />}
             thread={!inbox.shown && selectedPane !== null && note === null ? { machines, activity, machineId: selectedMachineId, pane: selectedPane, connection: headerConnection, watching: viewOnly(selectedMachineId), severalPcs: sidebarMachines.length > 1 } : null}
