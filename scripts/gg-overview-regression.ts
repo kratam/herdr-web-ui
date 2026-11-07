@@ -133,7 +133,7 @@ try {
   const area = (await page.locator(".pane-split").boundingBox())!;
   await page.mouse.move(area.x + area.width * 0.8, area.y + area.height / 2, { steps: 8 });
   await page.mouse.move(area.x + area.width * 0.8, area.y + area.height / 2);
-  await page.waitForFunction(() => document.querySelector(".split-drop")?.getAttribute("data-side") === "right");
+  await page.waitForFunction(() => document.querySelector(".split-drop")?.getAttribute("data-edge") === "right");
   await page.mouse.up();
   await page.locator(`.pane-slot[data-side="right"] .pane-frame[data-layout-pane="${paneB}"]`).waitFor();
   await page.locator('.pane-slot[data-side="left"]').getByRole("tab", { name: "Áttekintés", exact: true }).click();

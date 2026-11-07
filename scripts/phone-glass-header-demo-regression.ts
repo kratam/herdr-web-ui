@@ -73,7 +73,7 @@ try {
         page.on("pageerror", (error) => errors.push(error.message));
         await page.goto(`http://127.0.0.1:${server.port}/herdr-web-ui/demo/app/?pane=${encodeURIComponent(panes.api)}`);
         await page.locator(".conn-live").waitFor();
-        // A fixture egyetlen natív tabja mellett a GG-áttekintő is megmarad.
+        // A short phone draws no tab row for a workspace's only tab: close the pane's sibling tabs.
         const closed = await page.evaluate(async (id) => {
           const { snapshot } = await (await fetch("/api/session")).json() as { snapshot: { panes: { pane_id: string; tab_id: string; workspace_id: string }[]; tabs: { tab_id: string; workspace_id: string }[] } };
           const own = snapshot.panes.find((pane) => pane.pane_id === id)!;
@@ -197,15 +197,15 @@ try {
         await page.setViewportSize({ width: 390, height: 470 });
         await page.evaluate(() => (window as Window & { glassViewport?: (value: number) => void }).glassViewport?.(470));
         await page.waitForFunction(() => document.documentElement.hasAttribute("data-keyboard"));
-        await page.locator(".tab-strip").waitFor();
-        assert.equal(await page.locator(".pane-frame.is-single .pane-frame-menu").isVisible(), false,
-          "the retained GG tab row owns the pane actions on a short phone too");
+        await page.locator(".tab-strip").waitFor({ state: "detached" });
+        assert.notEqual(await page.locator(".app-header").evaluate((node) => getComputedStyle(node).backdropFilter), "none",
+          "the chat of a lone tab with no row puts the glass header over the pane");
         await checkMenus(page, "chat-keyboard");
 
         // a view-only connection draws its "View only" banner at the pane's top right, below the glass header
         await page.evaluate(() => (window as SocketsWindow).glassSockets.at(-1)!.send(JSON.stringify({ type: "role", mode: "observe" })));
         await page.locator(".terminal-banner-observe").waitFor();
-        await page.locator(".tab-strip").waitFor();
+        await page.locator(".tab-strip").waitFor({ state: "detached" });
         await checkMenus(page, "chat-keyboard-view-only");
         const header = await page.locator(".app-header").boundingBox();
         if (!header) throw new Error("the glass header has a box");

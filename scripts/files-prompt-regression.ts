@@ -134,7 +134,7 @@ async function checkFiles(page: Page, label: string, phone: boolean, paneA: stri
   // Settings opened by its shortcut with Files open takes the keyboard: one Escape closes Settings alone, the next Files
   await page.getByRole("button", { name: "Browse files", exact: true }).click();
   await dialog.waitFor();
-  await page.keyboard.press("Control+Shift+Comma");
+  await page.keyboard.press("ControlOrMeta+Shift+Comma");
   const settings = page.locator(".settings-dialog");
   await settings.waitFor();
   await page.keyboard.press("Escape");
@@ -145,7 +145,7 @@ async function checkFiles(page: Page, label: string, phone: boolean, paneA: stri
   // Files is drawn over Settings: a click in it takes the keyboard back, and then its Escape leaves Settings open
   await page.getByRole("button", { name: "Browse files", exact: true }).click();
   await dialog.waitFor();
-  await page.keyboard.press("Control+Shift+Comma");
+  await page.keyboard.press("ControlOrMeta+Shift+Comma");
   await settings.waitFor();
   await dialog.getByRole("button", { name: "Browse", exact: true }).click();
   await page.keyboard.press("Escape");
@@ -156,9 +156,9 @@ async function checkFiles(page: Page, label: string, phone: boolean, paneA: stri
   // Files opened from the palette over Settings holds the keyboard: Escape closes Files first, though Settings
   // listened first (#3037)
   const browseOverSettings = async (): Promise<void> => {
-    await page.keyboard.press("Control+Shift+Comma");
+    await page.keyboard.press("ControlOrMeta+Shift+Comma");
     await settings.waitFor();
-    await page.keyboard.press("Control+Shift+K");
+    await page.keyboard.press("ControlOrMeta+Shift+K");
     await page.locator(".command-palette input[type='search']").fill("Browse files");
     await page.locator(".command-palette").getByRole("option", { name: /^Browse files/ }).first().click();
     await dialog.waitFor();
@@ -188,7 +188,7 @@ async function checkFiles(page: Page, label: string, phone: boolean, paneA: stri
   await page.locator(".header-side .new-workspace-button").click();
   const create = page.getByRole("dialog", { name: /^New workspace/ });
   await create.waitFor();
-  await page.keyboard.press("Control+Shift+Comma");
+  await page.keyboard.press("ControlOrMeta+Shift+Comma");
   await settings.waitFor();
   await page.keyboard.press("Escape");
   await settings.waitFor({ state: "detached" });

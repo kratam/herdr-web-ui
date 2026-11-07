@@ -79,6 +79,8 @@ export async function checkUsageMeters(browser: Browser, origin: string): Promis
     await settingsButton.click();
     await openSettingsPage(page, "Agents");
     assert.equal(await limits.getByRole("button", { name: "Off", exact: true }).getAttribute("aria-pressed"), "true");
+    // A be- és kikapcsolás két külön mentés legyen, ne a debounce vonja össze őket.
+    const enabledSaved = page.waitForResponse(response => new URL(response.url()).pathname === "/api/preferences" && response.request().method() === "PUT" && response.request().postDataJSON()?.settings?.showUsage === true);
     // on, counted as before: what is left
     await limits.getByRole("button", { name: "Remaining", exact: true }).click();
     await page.keyboard.press("Escape");
@@ -214,7 +216,7 @@ export async function checkUsageMeters(browser: Browser, origin: string): Promis
     // A másik böngészőn kikapcsolt közös beállítást a telefonon is valódi felületi művelet oldja fel.
     await page.locator(".sidebar-footer-row .sidebar-footer-action").click();
     await openSettingsPage(page, "Agents");
-    await page.getByRole("switch", { name: "Show plan limits", exact: true }).setChecked(true);
+    await page.locator('.segmented[aria-label="Plan limits"]').getByRole("button", { name: "Remaining", exact: true }).click();
     await page.getByRole("button", { name: "Close settings", exact: true }).click();
     await page.getByRole("button", { name: "Open workspace list", exact: true }).click();
     // A geometriai ellenőrzés a fiók becsúszása után értelmezhető.
