@@ -130,7 +130,7 @@ async function checkFiles(page: Page, label: string, phone: boolean, paneA: stri
   await dialog.waitFor({ state: "hidden" });
   await page.getByRole("button", { name: "Browse files", exact: true }).click();
   await dialog.waitFor();
-  await page.keyboard.press("Control+Shift+Comma");
+  await page.keyboard.press("ControlOrMeta+Shift+Comma");
   const settings = page.locator(".settings-dialog");
   await settings.waitFor();
   await page.keyboard.press("Escape");
@@ -140,7 +140,7 @@ async function checkFiles(page: Page, label: string, phone: boolean, paneA: stri
   await dialog.waitFor({ state: "hidden" });
   await page.getByRole("button", { name: "Browse files", exact: true }).click();
   await dialog.waitFor();
-  await page.keyboard.press("Control+Shift+Comma");
+  await page.keyboard.press("ControlOrMeta+Shift+Comma");
   await settings.waitFor();
   await dialog.getByRole("button", { name: "Browse", exact: true }).click();
   await page.keyboard.press("Escape");
@@ -149,9 +149,9 @@ async function checkFiles(page: Page, label: string, phone: boolean, paneA: stri
   await page.keyboard.press("Escape");
   await settings.waitFor({ state: "detached" });
   const browseOverSettings = async (): Promise<void> => {
-    await page.keyboard.press("Control+Shift+Comma");
+    await page.keyboard.press("ControlOrMeta+Shift+Comma");
     await settings.waitFor();
-    await page.keyboard.press("Control+Shift+K");
+    await page.keyboard.press("ControlOrMeta+Shift+K");
     await page.locator(".command-palette input[type='search']").fill("Browse files");
     await page.locator(".command-palette").getByRole("option", { name: /^Browse files/ }).first().click();
     await dialog.waitFor();
@@ -177,7 +177,7 @@ async function checkFiles(page: Page, label: string, phone: boolean, paneA: stri
   await page.locator(".header-side .new-workspace-button").click();
   const create = page.getByRole("dialog", { name: /^New workspace/ });
   await create.waitFor();
-  await page.keyboard.press("Control+Shift+Comma");
+  await page.keyboard.press("ControlOrMeta+Shift+Comma");
   await settings.waitFor();
   await page.keyboard.press("Escape");
   await settings.waitFor({ state: "detached" });

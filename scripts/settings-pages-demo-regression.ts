@@ -598,8 +598,9 @@ try {
         if (process.env.UI_EVIDENCE_DIR) await page.screenshot({ path: join(process.env.UI_EVIDENCE_DIR, "select-arrows-desktop.png"), animations: "disabled" });
         const themePicker = page.getByLabel("Interface font", { exact: true });
         await themePicker.focus();
-        await page.keyboard.press("ArrowDown");
-        assert.notEqual(await themePicker.inputValue(), "default", "the native select keeps keyboard selection");
+        // A natív karakteres választás nem függ a platform felugró menüjének nyílbillentyűitől (macOS).
+        await themePicker.press("n");
+        assert.equal(await themePicker.inputValue(), "noto", "the native select keeps keyboard selection");
         await themePicker.selectOption("default");
         await page.emulateMedia({ forcedColors: "active" });
         assert.equal(await themePicker.evaluate((select) => getComputedStyle(select).appearance), "auto", "forced colors restores the native indicator");

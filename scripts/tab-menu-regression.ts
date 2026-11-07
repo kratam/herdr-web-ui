@@ -371,7 +371,7 @@ async function checkDesktop(browser: Browser, origin: string, first: string, sec
     assert.deepEqual(closeTabResponse.request().postDataJSON(), { tab_id: target.tab.tab_id });
     await inactive.waitFor({ state: "detached" });
     await currentPane(page, first);
-    assert.equal(await strip.getByRole("tab").count(), 1, "closing an inactive tab preserves the original tab");
+    assert.equal(await strip.locator('[role="tab"][data-tab-id]').count(), 1, "closing an inactive tab preserves the original tab");
     const closable = await tabCreate({ workspaceId: nativeTab.workspace_id, label: "close-x" });
     const closableTab = page.getByRole("tab", { name: "close-x", exact: true });
     await closableTab.hover();
@@ -381,7 +381,7 @@ async function checkDesktop(browser: Browser, origin: string, first: string, sec
     assert.deepEqual((await closingByX).request().postDataJSON(), { tab_id: closable.tab.tab_id });
     await closableTab.waitFor({ state: "detached" });
     assert.equal(await tab.getAttribute("aria-selected"), "true", "closing another tab by its close keeps the open tab");
-    assert.equal(await strip.getByRole("tab").count(), 1);
+    assert.equal(await strip.locator('[role="tab"][data-tab-id]').count(), 1);
 
     const keyboardTarget = await tabCreate({ workspaceId: nativeTab.workspace_id, label: "keyboard-close-target" });
     const keyboardTab = strip.locator(`[data-tab-id=${JSON.stringify(keyboardTarget.tab.tab_id)}]`);
