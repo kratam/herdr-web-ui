@@ -15,7 +15,7 @@
  * `sheet`, the tabs listed with their state, agent and a Close each, and the ways to a new tab.
  */
 import { useContext, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, Bot, ChevronDown, Ellipsis, Folder, FolderInput, Pencil, Plus, Terminal, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, ChevronDown, Ellipsis, Folder, FolderInput, LayoutDashboard, Pencil, Plus, Terminal, X } from "lucide-react";
 
 import "./TabStrip.css";
 
@@ -297,7 +297,8 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
   // browser's: moved by deltaY alone, the strip would go against the swipe's sideways part (#2103).
   // React's own onWheel is passive, so the listener is the strip's own; `end` coming or going (a
   // split opened or closed) draws the strip as a new node, which needs it again.
-  const tabsHidden = tabRowHidden(cramped, tabs.length, inHeader) && !overview;
+  // saját: az Áttekintés tab az upstream szabályát követi; ahol nincs sor, a fejléc tablistájában az első (sheetItems)
+  const tabsHidden = tabRowHidden(cramped, tabs.length, inHeader);
   // a row that goes (a phone turned narrow) takes the menu it opened with it
   useLayoutEffect(() => {
     if (tabsHidden && editing === null) setPicker(null);
@@ -577,7 +578,7 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
       <div ref={strip} className="tab-strip" role="tablist" aria-label={t("Tabs of {workspace}", { workspace: workspace.label })} aria-busy={reorder.moving} onKeyDown={onKeyDown} onScroll={onScroll}
         onFocus={(event) => { if (event.target.getAttribute("role") === "tab") focusedTab.current = event.target; }}
         onBlur={(event) => { if (event.relatedTarget !== null) focusedTab.current = null; }}>
-        {overview && <div className={`tab-strip-item${overview.selected ? " is-active" : ""}`}><button type="button" role="tab" className="tab-strip-tab" aria-selected={overview.selected} aria-controls={panelId} tabIndex={overview.selected ? 0 : -1} onClick={overview.onSelect}>Áttekintés</button></div>}
+        {overview && <div className={`tab-strip-item tab-strip-overview${overview.selected ? " is-active" : ""}`}><button type="button" role="tab" className="tab-strip-tab" aria-label="Áttekintés" title="Áttekintés" aria-selected={overview.selected} aria-controls={panelId} tabIndex={overview.selected ? 0 : -1} onClick={overview.onSelect}><LayoutDashboard aria-hidden="true" /></button></div>}
         {tabs.map((tab, index) => {
           if (inRow !== null && !inRow.has(index)) return null;
           const active = !overview?.selected && tab.tab_id === selectedPane.tab_id;
@@ -693,14 +694,16 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
       id: `tab:${tab.tab_id}`, label: nameOf(tab), icon: Terminal,
       glyph: <span className="tab-sheet-marks" aria-hidden="true">{statusMark(status)}{agent ? <AgentMark agent={agent} size={18} /> : <Terminal aria-hidden="true" />}</span>,
       ...(busyStatus(status) ? { hint: t(STATUS_WORD[status]) } : {}),
-      current: tab.tab_id === selectedPane.tab_id,
+      current: !overview?.selected && tab.tab_id === selectedPane.tab_id,
       run: () => {
         const pane = paneFor(tab);
-        if (pane && pane.pane_id !== selectedPane.pane_id) onSelectPane(pane.pane_id);
+        if (pane && (overview?.selected || pane.pane_id !== selectedPane.pane_id)) onSelectPane(pane.pane_id);
       },
     };
   };
   const sheetItems = (): RowMenuItem[] => [
+    // saját: a workspace-áttekintő a lista elején
+    ...(overview ? [{ id: "gg-overview", label: "Áttekintés", icon: LayoutDashboard, current: overview.selected, run: overview.onSelect }] : []),
     ...tabs.map((tab): RowMenuItem => ({
       ...tabItem(tab),
       ...(tabLocked(tab) || !closable ? {} : { aside: { label: t("Close {tab}", { tab: nameOf(tab) }), icon: X, run: () => requestClose(tab) } }),

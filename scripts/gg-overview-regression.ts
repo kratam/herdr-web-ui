@@ -69,15 +69,30 @@ try {
   await page.getByRole("link", { name: prefix, exact: true }).click();
   await page.getByRole("heading", { name: prefix, exact: true }).waitFor();
   const firstTab = page.getByRole("tab").first();
-  assert.equal(await firstTab.innerText(), "Áttekintés");
+  assert.equal(await firstTab.getAttribute("aria-label"), "Áttekintés");
   assert.equal(await firstTab.getAttribute("aria-selected"), "true");
   await page.getByText("Melyik irány legyen?", { exact: true }).click();
   await page.getByText("Az egyszerűbb megoldás.", { exact: false }).waitFor();
   await page.keyboard.press("ControlOrMeta+Shift+K");
   await page.getByRole("dialog", { name: "Command palette", exact: true }).waitFor();
   await page.keyboard.press("Escape");
+  // alacsony képernyőn egyetlen tab mellett az upstream nem rajzol tabsort; az Áttekintés tab is vele megy
   await page.setViewportSize({ width: 740, height: 500 });
-  await page.getByRole("tab", { name: "Áttekintés", exact: true }).waitFor({ state: "visible" });
+  await page.getByRole("tab", { name: "Áttekintés", exact: true }).waitFor({ state: "detached" });
+  // telefonon nincs tabsor: a fejléc címe listázza a tabokat, az Áttekintés az első; onnan oda-vissza lehet váltani
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("tab", { name: "Áttekintés", exact: true }).waitFor({ state: "detached" });
+  const phoneTabs = page.locator(".app-header .context-tabs");
+  await phoneTabs.click();
+  const overviewItem = page.locator('.row-sheet-item[data-item="gg-overview"]');
+  assert.equal(await overviewItem.getAttribute("aria-current"), "true");
+  const nativeItem = page.locator('.row-sheet-item[data-item^="tab:"]').first();
+  assert.equal(await nativeItem.getAttribute("aria-current"), null);
+  await nativeItem.click();
+  await page.locator(".gg-overview-host").waitFor({ state: "detached" });
+  await phoneTabs.click();
+  await page.locator('.row-sheet-item[data-item="gg-overview"]').click();
+  await page.getByRole("heading", { name: prefix, exact: true }).waitFor();
   await page.setViewportSize({ width: 1280, height: 960 });
   if (process.env.CHECK_BROWSER_EVIDENCE_DIR) await page.screenshot({ path: join(process.env.CHECK_BROWSER_EVIDENCE_DIR, "gg-workspace-mvp.png"), fullPage: true });
   if (process.env.CHECK_BROWSER_EVIDENCE_DIR) {
@@ -194,7 +209,7 @@ try {
   assert.ok((await firstFailureRow.locator("td").nth(1).innerText()).startsWith("—"));
   assert.ok((await firstFailureRow.locator("td").nth(2).innerText()).startsWith("—"));
   assert.deepEqual(errors, []);
-  console.log("PASS: külön prioritás-mentés mindkét nézetben, tartós story-szintű halasztás/visszavonás, nincs írás puszta kiválasztásra; sidebar utolsó natív/áttekintő tabja, next/prev áttekintővel, cache tabváltás után, clipboard-hiba tabnyitás nélkül, másolás majd Codex/Claude tab üzenet nélkül; globális/workspace-nézet, jsonb javaslat, első tab kis képernyőn is, paletta-gyorsbillentyű, natív tabváltás, inaktív split megőrzése, bezárt workspace, első és későbbi forráshiba.");
+  console.log("PASS: külön prioritás-mentés mindkét nézetben, tartós story-szintű halasztás/visszavonás, nincs írás puszta kiválasztásra; sidebar utolsó natív/áttekintő tabja, next/prev áttekintővel, cache tabváltás után, clipboard-hiba tabnyitás nélkül, másolás majd Codex/Claude tab üzenet nélkül; globális/workspace-nézet, jsonb javaslat, alacsony képernyőn tabsor nélkül, telefonon a fejléc tablistájából oda-vissza, paletta-gyorsbillentyű, natív tabváltás, inaktív split megőrzése, bezárt workspace, első és későbbi forráshiba.");
 } finally {
   await browser?.close(); server?.stop();
   for (const workspace of (await sessionSnapshot()).workspaces) {

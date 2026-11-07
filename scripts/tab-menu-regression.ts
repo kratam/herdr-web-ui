@@ -279,7 +279,7 @@ async function checkDesktop(browser: Browser, origin: string, first: string, sec
     await frame(page, first).locator(".xterm-helper-textarea").focus();
     await dragInactiveBeforeFirst();
     await until(async () => JSON.stringify(await order()) === JSON.stringify(movedOrder), "a drag changes native tab order");
-    assert.equal(await strip.getByRole("tab").first().textContent(), "Áttekintés", "the virtual overview stays before the reordered native tabs");
+    assert.equal(await strip.getByRole("tab").first().getAttribute("aria-label"), "Áttekintés", "the virtual overview stays before the reordered native tabs");
     assert.deepEqual((await sessionSnapshot()).tabs.filter((entry) => entry.workspace_id === nativeTab.workspace_id).map((entry) => entry.tab_id), movedOrder);
     await currentPane(page, first);
     assert.equal((await sessionSnapshot()).focused_pane_id, first, "dragging an inactive tab preserves native pane focus");
@@ -787,9 +787,7 @@ export async function checkTabMenu(browser: Browser, origin: string): Promise<vo
     await checkDesktop(browser, origin, first, second, created.root_pane.tab_id);
     // A phone's title lists the tabs at both sizes; compact-height lone tabs wider than a phone are
     // exercised in phone-glass-header-demo-regression.ts.
-    // GG-fork: a rögzített Áttekintés tab telefonon is megtartja a tabsort, az upstream telefonos
-    // ellenőrzés viszont a tabsor nélküli fejlécre épül; amíg a telefonos viselkedés nincs eldöntve, kimarad.
-    void checkPhone;
+    for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 720 }]) await checkPhone(browser, origin, first, second, viewport);
     await checkTouchTablet(browser, origin, first);
     console.log("PASS native tab drag/keyboard/touch reorder, cancellation and failure handling, desktop context and keyboard tab menus, touch menu buttons, inactive-tab close, simultaneous split terminals, focus and input isolation, swap, split, divider drag, zoom and phone sheets");
   } finally {

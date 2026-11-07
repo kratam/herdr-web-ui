@@ -903,7 +903,7 @@ export function App() {
           </button>
         </div>
         <HeaderNote note={herdrPrefixWaiting ? t("herdr prefix: press a key") : note} />
-        {gg.target !== null ? <GgOverviewTitle target={gg.target} /> : stripInHeader ? (
+        {gg.target !== null ? <GgOverviewTitle target={gg.target} tabs={tabsInHeader && selectedWorkspace && !guideShown ? { label: t("Tabs of {workspace}", { workspace: selectedWorkspace.label }), open: tabSheet !== null, toggle: toggleTabSheet } : undefined} /> : stripInHeader ? (
           <div className="header-tabs">
             {/* the strip that cannot be drawn leaves the sidebar and the pane working, as the pane's own strip did */}
             <RenderBoundary resetKey={`${selectedMachineId}:${selectedPane.pane_id}`} fallback={(retry) => <RegionCrash message={t("This pane can't be shown.")} retry={retry} />}>
@@ -1104,7 +1104,7 @@ export function App() {
           onStarting={setupGuide.voidTickets}
           onPaired={() => void loadHealth()}
           onOpened={(paneId, agentStarted) => { if (agentStarted) actions.agentStarted("local", paneId); setupGuide.finish(() => selectTarget("local", paneId)); void load(); }} /></MachineContext.Provider>}
-        {guideShown ? null : gg.target !== null ? <GgOverviewHost gg={gg} machines={machines} snapshot={snapshot} selectedMachineId={selectedMachineId} selectedPane={selectedPane} selectedWorkspace={selectedWorkspace} actions={actions} load={load} />
+        {guideShown ? null : gg.target !== null ? <GgOverviewHost gg={gg} machines={machines} snapshot={snapshot} selectedMachineId={selectedMachineId} selectedPane={selectedPane} selectedWorkspace={selectedWorkspace} actions={actions} load={load} inHeader={tabsInHeader} sheet={tabSheet} onSheetClose={closeTabSheet} />
         : <div ref={paneAreaRef} className={`pane-split${splitOn ? " is-split" : ""}`} onDragEnterCapture={paneDragOver} onDragOverCapture={paneDragOver} onDragLeave={paneDragLeave} onDropCapture={paneDrop}>
           {shownSlots.map((slot) => {
             const active = !splitOn || split!.active === slot;

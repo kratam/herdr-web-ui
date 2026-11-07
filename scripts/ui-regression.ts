@@ -1876,7 +1876,7 @@ try {
   const strip = page.locator(".tab-strip");
   await strip.waitFor();
   assert.deepEqual(await strip.locator('[role="tab"][data-tab-id]').allTextContents(), ["Tab 1", "second"]);
-  assert.equal(await strip.getByRole("tab").first().textContent(), "Áttekintés");
+  assert.equal(await strip.getByRole("tab").first().getAttribute("aria-label"), "Áttekintés");
   assert.equal(await strip.getByRole("tab", { selected: true }).textContent(), "second");
   assert.equal(await strip.locator(".tab-strip-panes").count(), 0, "tab chevrons are removed");
   // the header's row is a browser's tab strip: the open tab carries its close, a tab at rest only while hovered
