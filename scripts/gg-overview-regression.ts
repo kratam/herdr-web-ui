@@ -71,6 +71,9 @@ try {
   const firstTab = page.getByRole("tab").first();
   assert.equal(await firstTab.getAttribute("aria-label"), "Áttekintés");
   assert.equal(await firstTab.getAttribute("aria-selected"), "true");
+  // asztalon az áttekintő is a fejléc tabsorát használja (upstream v0.5.0), nem rajzol sajátot a tartalom fölé
+  assert.equal(await page.locator(".app-header .header-tabs [role=tab][aria-selected=true]").getAttribute("aria-label"), "Áttekintés");
+  assert.equal(await page.locator(".gg-overview-host .tab-strip").count(), 0);
   await page.getByText("Melyik irány legyen?", { exact: true }).click();
   await page.getByText("Az egyszerűbb megoldás.", { exact: false }).waitFor();
   await page.keyboard.press("ControlOrMeta+Shift+K");
