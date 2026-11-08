@@ -166,7 +166,7 @@ export function GgOverviewTitle({ target, tabs }: { target: GgOverviewTarget; ta
 }
 
 /** Az áttekintő a pane-terület helyén: workspace-nézetben a workspace tabsorával együtt. */
-export function GgOverviewHost({ gg, machines, snapshot, selectedMachineId, selectedPane, selectedWorkspace, actions, load, inHeader = false, sheet = null, onSheetClose }: {
+export function GgOverviewHost({ gg, machines, snapshot, selectedMachineId, selectedPane, selectedWorkspace, actions, load, headerStrip = false, inHeader = false, sheet = null, onSheetClose }: {
   gg: GgOverview;
   machines: Machine[];
   snapshot: SessionSnapshot | null | undefined;
@@ -175,6 +175,8 @@ export function GgOverviewHost({ gg, machines, snapshot, selectedMachineId, sele
   selectedWorkspace: WorkspaceInfo | null;
   actions: AppActions;
   load(): unknown;
+  /** asztal: a tabsor a fejlécben van (App `stripInHeader`), itt nem kell még egy */
+  headerStrip?: boolean;
   /** telefon: a tabokat a fejléc címe listázza (TabStrip `inHeader`/`sheet`) */
   inHeader?: boolean;
   sheet?: HTMLElement | null;
@@ -183,7 +185,7 @@ export function GgOverviewHost({ gg, machines, snapshot, selectedMachineId, sele
   const target = gg.target;
   if (target === null) return null;
   return <div className="gg-overview-host">
-    {target.workspaceId !== null && selectedPane && selectedWorkspace && selectedMachineId === target.machineId && selectedWorkspace.workspace_id === target.workspaceId && snapshot && <TabStrip snapshot={snapshot} workspace={selectedWorkspace} selectedPane={selectedPane} onSelectPane={gg.selectPane} onNewTab={() => actions.openNewTab()} onNewTerminal={() => actions.openTerminalTab()} overview={{ selected: true, onSelect: () => undefined }} inHeader={inHeader} sheet={sheet} onSheetClose={onSheetClose} />}
+    {!headerStrip && target.workspaceId !== null && selectedPane && selectedWorkspace && selectedMachineId === target.machineId && selectedWorkspace.workspace_id === target.workspaceId && snapshot && <TabStrip snapshot={snapshot} workspace={selectedWorkspace} selectedPane={selectedPane} onSelectPane={gg.selectPane} onNewTab={() => actions.openNewTab()} onNewTerminal={() => actions.openTerminalTab()} overview={{ selected: true, onSelect: () => undefined }} inHeader={inHeader} sheet={sheet} onSheetClose={onSheetClose} />}
     <GgOverviewPanel cache={gg.feed} onAgentPane={(machineId, paneId, started) => { if (started) actions.agentStarted(machineId, paneId); gg.selectTarget(machineId, paneId); void load(); }} target={target} machines={machines} onPane={(machineId, paneId) => gg.selectTarget(machineId, paneId)} onWorkspace={(machineId, workspaceId, paneId) => { gg.selectTarget(machineId, paneId); gg.setTarget({ machineId, workspaceId }); void load(); }} onGlobal={() => gg.setTarget({ machineId: "local", workspaceId: null })} />
   </div>;
 }

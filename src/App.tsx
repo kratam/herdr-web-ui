@@ -812,6 +812,8 @@ export function App() {
   // then the lens switch, Files and More (styles.css .header-tabs, THIRD_PARTY_NOTICES.md). A split keeps a
   // strip per half and the title here; a phone keeps the title that lists the tabs.
   const stripInHeader = wideScreen && !splitOn && !tabsInHeader && !guideShown && snapshot !== null && selectedPane !== null && selectedWorkspace !== null;
+  // saját: a workspace-áttekintő is a fejléc tabsorát használja, kijelölt Áttekintés ikonnal (GgOverviewHost nem rajzol sajátot)
+  const ggStripTarget = gg.target !== null && gg.target.workspaceId !== null && gg.target.machineId === selectedMachineId && selectedWorkspace?.workspace_id === gg.target.workspaceId;
   // from 769px with a mouse the pane column ends in the Herdr app's status bar: where the pane is, its branch,
   // the connection. A touch screen keeps that room for its key bar and says them in More and the chip.
   const statusBarShown = wideScreen && keyboardLikely && selectedPane !== null && crumb !== null && !guideShown;
@@ -903,12 +905,12 @@ export function App() {
           </button>
         </div>
         <HeaderNote note={herdrPrefixWaiting ? t("herdr prefix: press a key") : note} />
-        {gg.target !== null ? <GgOverviewTitle target={gg.target} tabs={tabsInHeader && selectedWorkspace && !guideShown ? { label: t("Tabs of {workspace}", { workspace: selectedWorkspace.label }), open: tabSheet !== null, toggle: toggleTabSheet } : undefined} /> : stripInHeader ? (
+        {gg.target !== null && !(stripInHeader && ggStripTarget) ? <GgOverviewTitle target={gg.target} tabs={tabsInHeader && selectedWorkspace && !guideShown ? { label: t("Tabs of {workspace}", { workspace: selectedWorkspace.label }), open: tabSheet !== null, toggle: toggleTabSheet } : undefined} /> : stripInHeader ? (
           <div className="header-tabs">
             {/* the strip that cannot be drawn leaves the sidebar and the pane working, as the pane's own strip did */}
             <RenderBoundary resetKey={`${selectedMachineId}:${selectedPane.pane_id}`} fallback={(retry) => <RegionCrash message={t("This pane can't be shown.")} retry={retry} />}>
             <PanePressContext.Provider value={pressPane}>
-              <TabStrip snapshot={snapshot} workspace={selectedWorkspace} selectedPane={selectedPane} onSelectPane={selectPane} splitDrag browserTabs closable={auth?.role !== "watch"} overview={gg.tabOverview(selectPane, selectedPane.pane_id, selectedMachineId, selectedWorkspace.workspace_id)}
+              <TabStrip snapshot={snapshot} workspace={selectedWorkspace} selectedPane={selectedPane} onSelectPane={selectPane} splitDrag browserTabs closable={auth?.role !== "watch"} overview={ggStripTarget ? { selected: true, onSelect: () => undefined } : gg.tabOverview(selectPane, selectedPane.pane_id, selectedMachineId, selectedWorkspace.workspace_id)}
                 renameRequest={renameRequest?.machineId === selectedMachineId && renameRequest.paneId === selectedPane.pane_id ? renameRequest : null}
                 onRenameHandled={clearRenameRequest}
                 onNewTab={() => actions.openNewTab()}
@@ -1104,7 +1106,7 @@ export function App() {
           onStarting={setupGuide.voidTickets}
           onPaired={() => void loadHealth()}
           onOpened={(paneId, agentStarted) => { if (agentStarted) actions.agentStarted("local", paneId); setupGuide.finish(() => selectTarget("local", paneId)); void load(); }} /></MachineContext.Provider>}
-        {guideShown ? null : gg.target !== null ? <GgOverviewHost gg={gg} machines={machines} snapshot={snapshot} selectedMachineId={selectedMachineId} selectedPane={selectedPane} selectedWorkspace={selectedWorkspace} actions={actions} load={load} inHeader={tabsInHeader} sheet={tabSheet} onSheetClose={closeTabSheet} />
+        {guideShown ? null : gg.target !== null ? <GgOverviewHost gg={gg} machines={machines} snapshot={snapshot} selectedMachineId={selectedMachineId} selectedPane={selectedPane} selectedWorkspace={selectedWorkspace} actions={actions} load={load} headerStrip={stripInHeader} inHeader={tabsInHeader} sheet={tabSheet} onSheetClose={closeTabSheet} />
         : <div ref={paneAreaRef} className={`pane-split${splitOn ? " is-split" : ""}`} onDragEnterCapture={paneDragOver} onDragOverCapture={paneDragOver} onDragLeave={paneDragLeave} onDropCapture={paneDrop}>
           {shownSlots.map((slot) => {
             const active = !splitOn || split!.active === slot;
