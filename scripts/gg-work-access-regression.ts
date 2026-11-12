@@ -16,7 +16,7 @@ const service = new GgOverviewService({ load: async () => { reads++; return { ve
 const server = createServer({ port: 0, hostname: "127.0.0.1", stateDir: root, token, tailscaleOwner: null, tailscaleServeOnly: false, machines: false, usage: new UsageService(undefined, []), ggOverview: service });
 try {
  const origin = `http://127.0.0.1:${server.port}`;
- for (const path of ["overview", "host-loads", "work"]) {
+ for (const path of ["overview", "work"]) {
   const method = path === "work" ? "PUT" : "GET";
   const anonymous = await fetch(`${origin}/api/gg/${path}`, { method, headers: { origin } });
   assert.equal(anonymous.status, 401); await anonymous.body?.cancel();

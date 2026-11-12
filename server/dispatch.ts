@@ -57,7 +57,6 @@ import { handleUserFontsRequest } from "./user-fonts.ts";
 import { USER_FONTS_PATH } from "../shared/user-fonts.ts";
 import type { UsageAccountList } from "./usage-account-list.ts";
 import { handleGgOverviewRequest, type GgOverviewService } from "./gg-overview.ts";
-import type { GgHostLoads } from "./gg-host-load.ts";
 import type { GgWorkService } from "./gg-work.ts";
 import type { GgDecisionService } from "./gg-decisions.ts";
 import type { GgDiscussionService } from "./gg-discussion.ts";
@@ -119,7 +118,6 @@ export interface RequestServices {
   /** Saját GG-kiegészítés (server/gg-overview.ts). */
   readonly ggOverview: GgOverviewService;
   readonly ggWork: GgWorkService;
-  readonly ggLoads: GgHostLoads;
   readonly ggDecisions: GgDecisionService;
   readonly ggDiscussion: GgDiscussionService;
   readonly voice: VoiceService;
@@ -156,7 +154,7 @@ export interface ServerContext {
 const OTHER_MACHINE_FILES = /^\/api\/(?:fs\/|pane\/(?:files|docs|image)$|workspace\/(?:diff\/|git\/|directories$|pr(?:$|\/)))/;
 
 export async function handleRequest(request: Request, ctx: ServerContext): Promise<Response | undefined> {
-  const { options, hostname, token, bridgeToken, bootId, devices, preferences, herdrSidebar, identityOf, serveOnly, portalGuards, shellAgents, agentDetector, agentOffered, agentInstaller, openCodeState, cliProxyRoutes, usageLogin, usage, ggOverview, ggWork, ggLoads, ggDecisions, ggDiscussion, voice, browserSnapshot, core, seen, piReader, orderSequence, clientConnectionLog, requestLog, portalStartupResult, portalStartup } = ctx.services;
+  const { options, hostname, token, bridgeToken, bootId, devices, preferences, herdrSidebar, identityOf, serveOnly, portalGuards, shellAgents, agentDetector, agentOffered, agentInstaller, openCodeState, cliProxyRoutes, usageLogin, usage, ggOverview, ggWork, ggDecisions, ggDiscussion, voice, browserSnapshot, core, seen, piReader, orderSequence, clientConnectionLog, requestLog, portalStartupResult, portalStartup } = ctx.services;
   const { sidecar, serialize, push, alertWebhook, logPushError, omo, claudeAgents, opencodeAgents, plans, clientSnapshot, machines, broadcastAll, collector, queueFirstMessage } = core;
   return requestLog.handle(request, async (headers) => {
   const startup = portalStartupResult ?? await portalStartup;
@@ -562,12 +560,6 @@ export async function handleRequest(request: Request, ctx: ServerContext): Promi
     if (readOnly || bridgeAuthorized) return jsonResponse({ error: { code: "read_only", message: "Interaktív helyi hozzáférés szükséges." } }, 403);
     if (request.method !== "PUT") return jsonResponse({ error: { code: "method_not_allowed", message: "Csak PUT támogatott." } }, 405);
     return ggWork.handle(request, await ggOverview.read(), true);
-  }
-  if (pathname === "/api/gg/host-loads") {
-    setRequestRoute(pathname);
-    if (readOnly || bridgeAuthorized) return jsonResponse({ error: { code: "read_only", message: "Interaktív helyi hozzáférés szükséges." } }, 403);
-    if (request.method !== "GET") return jsonResponse({ error: { code: "method_not_allowed", message: "Csak GET támogatott." } }, 405);
-    return ggLoads.response(machines?.list() ?? [{ id: "local", state: "connected" }]);
   }
   if (pathname === "/api/usage") { setRequestRoute(pathname); return handleUsageRequest(request, url, ctx.services.usageAccounts); }
   if (pathname === "/api/usage/accounts") { setRequestRoute(pathname); return ctx.services.usageAccounts.handle(request); }
