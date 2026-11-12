@@ -174,14 +174,11 @@ A sidebar workspace-váltása az utoljára látott tabot hozza vissza, beleértv
 következő pane gyorsbillentyű a meglévő sorrendben a virtuális első tabokat is
 érinti. Watch módban a korábbi natív navigáció marad.
 
-## Hostload és személyes munkalista
+## Személyes munkalista
 
-A sidebar alján a meglévő előfizetéses mérők fölött látható a gépek terhelése:
-**1 perces load / logikai CPU** (nem CPU-százalék). A részletekben az 5/15 perces
-átlag és a mérés ideje. Percenként, csak látható lapon frissül; a szerver gépenként
-összevonja a kéréseket. Távolról a meglévő hitelesített SSH-mesteren fix olvasóparancs
-fut. Nincs új bridge-bundle vagy SSH-belépési párbeszéd. Hibás/régi mérés nem nulla;
-Windows load jelenleg nem mérhető.
+A gépek terhelését 2026-11-12 óta a helyi sidebar nem mutatja: az upstream alsó sávja
+(CPU, memória, lemez) már kijelzi, így a helyi `/api/gg/host-loads` végpont és a
+`GgHostLoads` komponens kikerült.
 
 A globális összesítés alatt és a workspace munkáinál ugyanaz a prioritásválasztó,
 nézet- és rendezésvezérlő jelenik meg. A prioritás a kanonikus **Linear-storyé**,
@@ -210,8 +207,8 @@ még azonos értékű prioritást külön jelöljük; megváltoztatása vagy meg
 nyugtázza az átnézést. Régi értéket a felmérés alapján nem módosítottunk.
 A közös agentutasítás előírja: fontossági emberi szándék nélkül új issue prioritása 0.
 
-Privát végpontok: `GET /api/gg/host-loads`, `PUT /api/gg/work`.
-Mindkettő a meglévő hitelesítés mögött, csak interaktív helyi kliensnek érhető el;
+Privát végpont: `PUT /api/gg/work`.
+A meglévő hitelesítés mögött, csak interaktív helyi kliensnek érhető el;
 a PUT-ra a meglévő same-origin védelem is érvényes. Watch és bridge nem fér hozzá.
 
 ## Forrás-ellenőrzés és megőrzött válasz (2. fázis, 2026-10-28)

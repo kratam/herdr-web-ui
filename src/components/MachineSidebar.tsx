@@ -14,7 +14,6 @@ import { storedSidebarSplit, storeSidebarSplit, type SplitFold, type SplitOrder 
 import { SidebarActivityProvider, type SidebarActivity } from "../lib/sidebarActivity.tsx";
 import { filterSuggestions, machineFilter, sidebarFilter, type SidebarBranchLabels } from "../lib/sidebarFilter.ts";
 import { SidebarFilterProvider, useSidebarFilter } from "../lib/sidebarFilterContext.ts";
-import { GgHostLoads } from "./GgHostLoads.tsx";
 import { UsageMeters } from "./UsageMeters.tsx";
 import { RowMenu, rowMenuAnchor, type RowMenuItem } from "./RowMenu.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
@@ -299,7 +298,6 @@ export function MachineSidebar(props: Props) {
           showing in every tab. Settings → Phone & devices → Install offers it (SettingsDialog). */}
       <div className="sidebar-footer-row">
         <button className="btn btn-ghost sidebar-footer-action sidebar-footer-settings" aria-label={t("Settings")} title={t("Settings (⌘⇧,)")} onClick={props.actions.openSettings}><Settings aria-hidden="true" /></button>
-        {!props.watching && <GgHostLoads machines={props.machines} />}
         <UsageMeters watching={props.watching} onLocalLogin={props.watching ? undefined : props.onUsageLogin} />
       </div>
     </footer>
