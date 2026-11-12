@@ -14,7 +14,12 @@ if (suite !== "unit" && suite !== "integration") throw new Error("Usage: bun scr
 const files = testFiles(process.cwd());
 // The legacy updater suite mixes Git-only cases with real bridge restart/rollback cases.
 const needsHerdr = (file: string) => file.endsWith(".contract.test.ts") || file === "server/updater.test.ts" || file.startsWith("server/herdr/") || file.startsWith("server/pty/");
-const selected = files.filter((file) => needsHerdr(file) === (suite === "integration"));
+// GG-fork: az upstream release-tesztje és a hosted_only-olvasásokat tételesen felsoroló light-runner teszt
+// a fork saját CI-változásain (fork output, browser-fork job) elbukik, a forkon pedig nincs upstream
+// release. Csak az upstream repó CI-ja futtatja őket.
+const FORK_SKIPPED = new Set(["scripts/release-ci-reuse.test.ts", "scripts/light-runner-workflow.test.ts"]);
+const forkSkipped = (file: string) => FORK_SKIPPED.has(file) && process.env["GITHUB_REPOSITORY"] !== "devswha/herdr-web-ui";
+const selected = files.filter((file) => needsHerdr(file) === (suite === "integration") && !forkSkipped(file));
 if (!selected.length) throw new Error(`No ${suite} tests found`);
 const herdr = process.env["OVIS_HERDR_BIN"] || "herdr";
 if (suite === "integration" && !Bun.which(herdr)) {
