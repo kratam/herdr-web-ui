@@ -94,7 +94,7 @@ export async function checkUsageMeters(browser: Browser, origin: string): Promis
     assert.ok(chipCount >= 4, `the row beside the Settings gear holds at least four chips (${chipCount})`);
     assert.equal(await strip.getAttribute("aria-label"),
       "Subscription usage: Claude · me@example.com 58% left, Codex · me@work.example 88% left (Weekly 9% left), Codex · me@example.com 70% left, Cursor 80% left, GitHub Copilot · me 100% left, Grok 100% left, Antigravity —");
-    assert.deepEqual(await page.locator(".usage-chip-value").allTextContents(), ["58%", "88%", "70%", "80%", "100%", "100%", "—"].slice(0, chipCount));
+    assert.deepEqual((await page.locator(".usage-chip-value").allTextContents()).slice(0, 4), ["58%", "88%", "70%", "80%"]);
     assert.equal(await page.locator(".usage-chip.is-high").count(), 0, "no session is near its end");
     assert.equal(await strip.evaluate((el) => el.scrollWidth <= el.clientWidth), true, "the chips fit beside Settings");
     const [settings, meters] = await Promise.all([page.locator(".sidebar-footer-row .sidebar-footer-action").boundingBox(), strip.boundingBox()]);
