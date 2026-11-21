@@ -13,6 +13,8 @@ const DNS = "pc.example.ts.net";
  * it runs are named by their full paths for the same reason.
  */
 const FAKE = `#!/bin/sh
+# the fork's tailscaleCommand pins a host tailscaled socket; the fake answers either way
+case "$1" in --socket=*) shift ;; esac
 echo "$*" >> "$FAKE_TS/calls"
 case "$1 $2" in
   "status --json") /bin/cat "$FAKE_TS/status.json" ;;
