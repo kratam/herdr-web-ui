@@ -16,6 +16,7 @@ import { GgTaskList } from "./GgTaskList.tsx";
 import { GgDecisions } from "./GgDecisions.tsx";
 import { GgAttentionGroups } from "./GgAttentionGroups.tsx";
 import { buildAttentionBoard } from "../lib/ggAttentionBoard.ts";
+import { ExternalLink } from "../lib/externalLink.ts";
 import "./GgOverview.css";
 
 export interface GgOverviewTarget { machineId: string; workspaceId: string | null }
@@ -116,7 +117,7 @@ export function GgOverviewPanel({ target, cache, machines, onWorkspace, onPane, 
   };
   const chip = (state: string) => <span className={"gg-status gg-status--" + state}>{STATES[state] ?? state}</span>;
   const paneLink = (group: GgGroup, id: string, label: string) => <button className="gg-overview-link" type="button" disabled={!group.online} onClick={() => onPane(group.machineId, id)}>{label}</button>;
-  const external = (url: string | null, label: string) => url ? <a href={url} target="_blank" rel="noreferrer">{label}</a> : null;
+  const external = (url: string | null, label: string) => url ? <ExternalLink kind="link" href={url}>{label}</ExternalLink> : null;
   const workspaceMode = target.workspaceId !== null;
   return <section id={PANE_TABPANEL_ID} role={workspaceMode ? "tabpanel" : undefined} className="gg-overview" aria-label={workspaceMode ? "Workspace-áttekintés" : "Globális áttekintés"}>
     <div className="gg-overview-heading"><div><h1>{workspaceMode ? selected?.label ?? "Workspace betöltése…" : "Globális áttekintés"}</h1><p>{workspaceMode ? "A workspace döntései, munkái és hibái" : "Minden nyilvántartott munka, a bezárt workspace-eké is"}</p></div><button className="btn btn-ghost gg-overview-refresh" disabled={loading} onClick={() => { void cache.refresh(true); setAgentRead(value => value + 1); }}><RefreshCw aria-hidden="true" />{loading ? "Frissítés…" : "Frissítés"}</button></div>

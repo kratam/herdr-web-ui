@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { AttentionBoard, StoryRow } from "../lib/ggAttentionBoard.ts";
 import { GG_PRIORITIES } from "../lib/ggTaskAttention.ts";
 import { AssessmentBackground, riskMark } from "./GgDecisionPackage.tsx";
+import { ExternalLink } from "../lib/externalLink.ts";
 
 const SOON_PREVIEW = 10;
 
@@ -12,7 +13,7 @@ function Row({ row, showNext = true }: { row: StoryRow; showNext?: boolean }) {
   const priority = Math.min(...row.tasks.map(task => task.priority || 5));
   return <li className="gg-row">
     <div className="gg-row-main">
-      <span className="gg-row-title">{row.story && <small>{row.story}</small>}{url ? <a href={url} target="_blank" rel="noreferrer">{row.title}</a> : row.title}</span>
+      <span className="gg-row-title">{row.story && <small>{row.story}</small>}{url ? <ExternalLink kind="link" href={url}>{row.title}</ExternalLink> : row.title}</span>
       {showNext && <span className="gg-row-next">{row.next}</span>}
       {(row.meta || priority <= 2) && <small>{[priority <= 2 ? "P" + priority + " · " + GG_PRIORITIES[priority] : "", row.meta].filter(Boolean).join(" · ")}</small>}
     </div>

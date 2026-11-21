@@ -3,6 +3,7 @@ import type { GgAssessment, GgDecision, GgPreservedAnswer } from "../../shared/g
 import type { GgDecisionDetail, GgDecisionReply } from "../../shared/gg-decisions.ts";
 import type { DecisionPackage } from "../lib/ggAttentionBoard.ts";
 import { decisionRequestKey, ggDecisionApi } from "../lib/ggDecisions.ts";
+import { ExternalLink } from "../lib/externalLink.ts";
 
 export const riskMark = (score: number) => score >= 4 ? "🟢" : score === 3 ? "🟡" : "🔴";
 const discussionErrors: Record<string, string> = {
@@ -123,7 +124,7 @@ function DecisionBody({ decision, story, assessment, briefChanged, preserved, un
     {detail && <form className="gg-decision-form" aria-label={mode === "accept" ? "A javaslat elfogadása" : "Saját válasz"} onSubmit={event => { event.preventDefault(); void send(); }}>
       <h4>{mode === "accept" ? "A javaslat elfogadása: ellenőrizd, majd rögzítsd" : "Saját válasz"}</h4>
       {detail.blocked_reason && <p className="gg-overview-warning">{detail.blocked_reason === "expired_plan" ? "A terv lejárt. A folytatást a Beszéljük át gombbal rendezhetjük." : "Ez a döntés már lezárult. Frissítsd az áttekintőt."}</p>}
-      {(detail.plans.length > 0 || detail.binding.expected_pr_refs?.length) ? <details><summary>Mire vonatkozik a döntés?</summary><div className="gg-overview-details">{detail.binding.expected_pr_refs?.map(ref => <p key={ref.url}><a href={ref.url} target="_blank" rel="noreferrer">{ref.repository} PR</a><br /><code>{ref.head_sha}</code></p>)}{detail.plans.map(plan => <PlanDetails key={plan.id} plan={plan} />)}</div></details> : null}
+      {(detail.plans.length > 0 || detail.binding.expected_pr_refs?.length) ? <details><summary>Mire vonatkozik a döntés?</summary><div className="gg-overview-details">{detail.binding.expected_pr_refs?.map(ref => <p key={ref.url}><ExternalLink kind="link" href={ref.url}>{ref.repository} PR</ExternalLink><br /><code>{ref.head_sha}</code></p>)}{detail.plans.map(plan => <PlanDetails key={plan.id} plan={plan} />)}</div></details> : null}
       {answerChoices(detail).length > 0 && <div className="gg-decision-actions" role="group" aria-label="Válaszlehetőségek">{answerChoices(detail).map(choice => <button type="button" className="btn btn-ghost gg-choice" aria-pressed={raw === choice.value} key={choice.value} disabled={disabled || Boolean(detail.blocked_reason)} onClick={() => setRaw(choice.value)}>{choice.label}</button>)}</div>}
       <label htmlFor={"answer-" + decision.id}>Válaszod</label><textarea id={"answer-" + decision.id} value={raw} maxLength={16000} rows={3} disabled={Boolean(busy)} onChange={event => setRaw(event.target.value)} placeholder="Saját szavaiddal is válaszolhatsz." />
       <div className="gg-decision-actions"><button className="btn" type="submit" disabled={disabled || Boolean(detail.blocked_reason) || !raw.trim()}>{busy === "reply" ? "Mentés…" : briefChanged !== undefined ? "Válasz mentése (a frissítés után érvényesül)" : "Válasz rögzítése"}</button><button className="btn btn-ghost" type="button" disabled={Boolean(busy)} onClick={() => { setDetail(null); setRaw(""); intent.current = null; }}>Mégse</button></div>

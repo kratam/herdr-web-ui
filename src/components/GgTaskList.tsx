@@ -3,6 +3,7 @@ import type { GgTask } from "../../shared/gg-overview.ts";
 import type { GgOverviewFeed } from "../lib/ggOverviewFeed.ts";
 import { GG_PRIORITIES, isGgSnoozed, selectGgTasks, type GgTaskFilter } from "../lib/ggTaskAttention.ts";
 import { reasonLabels } from "../lib/ggAttentionBoard.ts";
+import { ExternalLink } from "../lib/externalLink.ts";
 
 /** Ugyanaz a story-szintű prioritás és személyes átnézés a globális és workspace-nézetben. */
 export function GgTaskList({ tasks, cache, disabled, chip, actions }: { tasks: GgTask[]; cache: GgOverviewFeed; disabled: boolean; chip(state: string): ReactNode; actions?: (task: GgTask) => ReactNode }) {
@@ -47,7 +48,7 @@ export function GgTaskList({ tasks, cache, disabled, chip, actions }: { tasks: G
     <p className="gg-section-hint">A prioritás a Linear-story összes munkájára érvényes. A későbbre tétel a story összes tervezett munkáját rejti az átnézésből; az agentek futását nem állítja meg.</p>
     {notice && <p className="gg-overview-warning" role="alert">{notice}</p>}
     {visible.map(task => <div className="gg-overview-item gg-task" key={task.id} aria-busy={busy === task.id || undefined}>
-      <div className="gg-task-content"><div className="gg-task-heading">{task.url ? <a href={task.url} target="_blank" rel="noreferrer">{task.title}</a> : <span>{task.title}</span>}{chip(task.state)}</div><small>{task.story}{reasonLabels(task.reason).length ? " · " + reasonLabels(task.reason).join(", ") : ""}{task.repositories.length ? " · " + task.repositories.map(repo => repo.split("/").at(-1)).join(", ") : ""}</small>
+      <div className="gg-task-content"><div className="gg-task-heading">{task.url ? <ExternalLink kind="link" href={task.url}>{task.title}</ExternalLink> : <span>{task.title}</span>}{chip(task.state)}</div><small>{task.story}{reasonLabels(task.reason).length ? " · " + reasonLabels(task.reason).join(", ") : ""}{task.repositories.length ? " · " + task.repositories.map(repo => repo.split("/").at(-1)).join(", ") : ""}</small>
         {task.priority_needs_review && <small className="gg-priority-review">Ellenőrizendő prioritás · korábbi agentírás, az emberi szándék nem igazolt</small>}
         {task.priority_sync_pending && <small>Linear mentve · a core-tükör frissítésére vár</small>}
         {isGgSnoozed(task, now) && <small>Későbbre téve: {new Date(task.snoozed_until!).toLocaleString("hu-HU")}</small>}
