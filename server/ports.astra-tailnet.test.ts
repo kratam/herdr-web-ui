@@ -10,7 +10,7 @@ it("the serve button makes no changes when it cannot inventory occupied ports", 
   try {
     const bin = join(dir, "tailscale");
     const calls = join(dir, "mutation");
-    writeFileSync(bin, `#!/bin/sh\ncase "$1:$2" in\nstatus:--json) printf '%s' '${status}';;\nserve:status) exit 1;;\n*) printf '%s' "$*" > "$(dirname "$0")/mutation"; exit 1;;\nesac\n`, { mode: 0o700 });
+    writeFileSync(bin, `#!/bin/sh\ncase "$1" in --socket=*) shift ;; esac\ncase "$1:$2" in\nstatus:--json) printf '%s' '${status}';;\nserve:status) exit 1;;\n*) printf '%s' "$*" > "$(dirname "$0")/mutation"; exit 1;;\nesac\n`, { mode: 0o700 });
     await serveTailscale(7317, [443], bin);
     expect(existsSync(calls) ? readFileSync(calls, "utf8") : null).toBeNull();
   } finally { rmSync(dir, { recursive: true, force: true }); }
@@ -28,6 +28,8 @@ for (const empty of ["null", "{}"]) {
     try {
       const bin = join(dir, "tailscale");
       writeFileSync(bin, `#!/bin/sh
+# the fork's tailscaleCommand pins a host tailscaled socket; the fake answers either way
+case "$1" in --socket=*) shift ;; esac
 D="$(dirname "$0")"
 case "$1:$2" in
 status:--json) printf '%s' '${status}';;
